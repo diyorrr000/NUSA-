@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <AssemblyName>Nusa</AssemblyName>
+    <RootNamespace>Nusa</RootNamespace>
+    <ApplicationIcon>Assets\nusa.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>1.0.0</Version>
+    <Product>Nusa</Product>
+    <Description>Windows ekranining tepasidagi jonli notch</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\nusa.ico" />
+  </ItemGroup>
+
+</Project>
