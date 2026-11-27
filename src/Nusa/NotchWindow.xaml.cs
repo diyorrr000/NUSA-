@@ -104,7 +104,7 @@ namespace Nusa
 
             SystemEvents.DisplaySettingsChanged += (_, _) => Dispatcher.BeginInvoke(PositionWindow);
             SystemEvents.PowerModeChanged += (_, e) => { if (e.Mode == PowerModes.StatusChange) Dispatcher.BeginInvoke(CheckPower); };
-            System.Net.NetworkInformation.NetworkChange.NetworkAvailabilityChanged += (_, e) => Dispatcher.BeginInvoke(() => OnNetwork(e.IsAvailable));
+            C.Network.Changed += OnNetwork;
 
             _lastPower = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus;
             _lastCaps = Native.CapsLockOn();
@@ -223,6 +223,11 @@ namespace Nusa
             RobotView.Visibility = C.S.Mascot ? Visibility.Visible : Visibility.Collapsed;
             MiniClock.Visibility = C.S.ShowClock ? Visibility.Visible : Visibility.Collapsed;
             var today = DateTime.Today;
+            // Zaryadlanayotgan bo'lsa — qo'ng'iroqcha o'rnida "⚡ 82%"
+            var charge = ChargeInfo();
+            ChargeText.Visibility = charge != null ? Visibility.Visible : Visibility.Collapsed;
+            BellView.Visibility = charge != null ? Visibility.Collapsed : Visibility.Visible;
+            if (charge != null) ChargeText.Text = "⚡ " + charge.Value + "%";
             BellDot.Visibility = C.Data.Todos.Any(t => !t.Done && t.RemindAt != null && t.RemindAt.Value.Date <= today)
                 ? Visibility.Visible : Visibility.Collapsed;
             MiniMusic.Visibility = _mode == Mode.Music ? Visibility.Visible : Visibility.Collapsed;
@@ -259,7 +264,7 @@ namespace Nusa
                 case Mode.Download: w = 330; break;
                 default:
                     if (minimal) { w = 180; h = 6; r = 3; }
-                    else w = 64 + (C.S.Mascot ? 40 : 0) + (C.S.ShowClock ? 70 : 0);
+                    else w = 64 + (C.S.Mascot ? 40 : 0) + (C.S.ShowClock ? 70 : 0) + (ChargeInfo() != null ? 30 : 0);
                     break;
             }
             SetEars(!(minimal && _mode == Mode.Idle));
@@ -613,7 +618,7 @@ namespace Nusa
         // =====================================================================
         // Ogohlantirishlar (alert)
         // =====================================================================
-        static bool IsSystemKind(string k) => k is "volume" or "brightness" or "caps" or "lang" or "power" or "net";
+        static bool IsSystemKind(string k) => k is "volume" or "brightness" or "caps" or "lang" or "power" or "charge" or "net";
 
         public void ShowAlert(Alert a)
         {
@@ -655,7 +660,7 @@ namespace Nusa
             SetEars(true);
 
             bool twoLine = !string.IsNullOrEmpty(a.Subtitle);
-            double w = IsSystemKind(a.Kind) ? 320 : 400;
+            double w = a.Kind is "power" or "charge" ? 370 : IsSystemKind(a.Kind) ? 330 : 400;
             AnimateIsland(w, twoLine ? 54 : 42, twoLine ? 24 : 20, 0.45);
 
             _alertTimer.Interval = TimeSpan.FromSeconds(a.Seconds);
@@ -670,7 +675,34 @@ namespace Nusa
             AlertTitle.Text = a.Title;
             AlertSub.Text = a.Subtitle;
             AlertSub.Visibility = string.IsNullOrEmpty(a.Subtitle) ? Visibility.Collapsed : Visibility.Visible;
-            AlertProgress.Visibility = a.Progress.HasValue ? Visibility.Visible : Visibility.Collapsed;
+            // Quvvat ogohlantirishlarida progress chiziq o'rniga batareya rasmi
+            bool battery = (a.Kind == "power" || a.Kind == "charge") && a.Progress.HasValue;
+            AlertBattery.Visibility = battery ? Visibility.Visible : Visibility.Collapsed;
+            if (battery)
+            {
+                double p = Math.Clamp(a.Progress!.Value, 0, 1);
+                bool charging = a.Kind == "charge";
+                AlertBatteryPct.Text = $"{Math.Round(p * 100)}%";
+                AlertBatteryPct.Foreground = UI.Br(a.Accent);
+                AlertBatteryFill.Background = UI.Br(a.Accent);
+                AlertBatteryBolt.Visibility = charging ? Visibility.Visible : Visibility.Collapsed;
+                double target = Math.Max(3, 31 * p);
+                if (charging)
+                {
+                    // Zaryad "to'lib kelayotgandek" animatsiya
+                    AlertBatteryFill.BeginAnimation(WidthProperty, new DoubleAnimation(Math.Max(3, target - 10), target, TimeSpan.FromMilliseconds(900))
+                    { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+                    AlertBatteryFill.BeginAnimation(OpacityProperty, new DoubleAnimation(0.55, 1, TimeSpan.FromMilliseconds(700))
+                    { AutoReverse = true, RepeatBehavior = new RepeatBehavior(3) });
+                }
+                else
+                {
+                    AlertBatteryFill.BeginAnimation(WidthProperty, null);
+                    AlertBatteryFill.BeginAnimation(OpacityProperty, null);
+                    AlertBatteryFill.Width = target;
+                }
+            }
+            AlertProgress.Visibility = a.Progress.HasValue && !battery ? Visibility.Visible : Visibility.Collapsed;
             if (a.Progress.HasValue)
             {
                 AlertProgressFill.Background = UI.Br(a.Accent);
@@ -754,33 +786,94 @@ namespace Nusa
         System.Windows.Forms.PowerLineStatus _lastPower;
         bool _lowBatteryWarned;
 
+        /// <summary>Zaryadlanayotgan bo'lsa batareya foizi, aks holda null.</summary>
+        static int? ChargeInfo()
+        {
+            var ps = System.Windows.Forms.SystemInformation.PowerStatus;
+            if (ps.BatteryChargeStatus.HasFlag(System.Windows.Forms.BatteryChargeStatus.NoSystemBattery)) return null;
+            if (ps.PowerLineStatus != System.Windows.Forms.PowerLineStatus.Online) return null;
+            return (int)Math.Round(ps.BatteryLifePercent * 100);
+        }
+
+        int _lastChargePct = -1;
+
         void CheckPower()
         {
             var ps = System.Windows.Forms.SystemInformation.PowerStatus;
             if (ps.BatteryChargeStatus.HasFlag(System.Windows.Forms.BatteryChargeStatus.NoSystemBattery)) return;
             int pct = (int)Math.Round(ps.BatteryLifePercent * 100);
+            bool charging = ps.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
+            var green = Color.FromRgb(0x30, 0xD1, 0x58);
+
             if (ps.PowerLineStatus != _lastPower)
             {
                 _lastPower = ps.PowerLineStatus;
+                _lastChargePct = pct;
+                Refresh();
                 if (!C.S.SystemOverlays) return;
-                bool charging = ps.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
-                if (charging) _lowBatteryWarned = false;
-                ShowAlert(new Alert(charging ? "\U0001F50C" : "\U0001F50B",
-                    charging ? "Quvvatlanmoqda" : "Quvvatdan uzildi", $"{pct}%",
-                    charging ? Color.FromRgb(0x30, 0xD1, 0x58) : Color.FromRgb(0xFF, 0x9F, 0x0A), 2.6, ps.BatteryLifePercent, "power"));
+                if (charging)
+                {
+                    _lowBatteryWarned = false;
+                    _fullWarned = pct >= 100;
+                    ShowAlert(new Alert("\U0001F50C", pct >= 100 ? "To'liq zaryadlangan" : "Zaryadlanmoqda",
+                        "Zaryadlovchi ulandi", green, 3.5, ps.BatteryLifePercent, "charge"));
+                }
+                else
+                {
+                    string sub = ps.BatteryLifeRemaining > 0
+                        ? $"~{UI.Duration(TimeSpan.FromSeconds(ps.BatteryLifeRemaining))} yetadi"
+                        : "Batareyadan ishlamoqda";
+                    var color = pct <= 20 ? Color.FromRgb(0xFF, 0x45, 0x3A) : Colors.White;
+                    ShowAlert(new Alert("\U0001F50B", "Zaryadlovchi uzildi", sub, color, 3.5, ps.BatteryLifePercent, "power"));
+                }
+                return;
             }
-            else if (!_lowBatteryWarned && pct <= 20 && ps.PowerLineStatus != System.Windows.Forms.PowerLineStatus.Online)
+
+            // Zaryadlanayotganda foiz o'zgarsa — kompakt notchdagi raqamni yangilaymiz
+            if (charging && pct != _lastChargePct)
+            {
+                _lastChargePct = pct;
+                Refresh();
+                if (pct >= 100 && !_fullWarned && C.S.SystemOverlays)
+                {
+                    _fullWarned = true;
+                    ShowAlert(new Alert("\U0001F50C", "To'liq zaryadlandi", "Zaryadlovchini uzsangiz bo'ladi", green, 4, 1.0, "charge"));
+                }
+            }
+            else if (!_lowBatteryWarned && pct <= 20 && !charging)
             {
                 _lowBatteryWarned = true;
-                ShowAlert(new Alert("\U0001F50B", "Batareya kam", $"{pct}% qoldi — zaryadlang", Color.FromRgb(0xFF, 0x45, 0x3A), 4, ps.BatteryLifePercent, "power"));
+                ShowAlert(new Alert("\U0001F50B", "Batareya kam", "Zaryadlovchini ulang", Color.FromRgb(0xFF, 0x45, 0x3A), 5, ps.BatteryLifePercent, "power"));
             }
         }
 
-        void OnNetwork(bool available)
+        bool _fullWarned;
+
+        void OnNetwork(NetState prev, NetState now)
         {
             if (!C.S.SystemOverlays) return;
-            ShowAlert(new Alert("", available ? "Internetga ulandi" : "Internet uzildi", "",
-                available ? Color.FromRgb(0x30, 0xD1, 0x58) : Color.FromRgb(0xFF, 0x45, 0x3A), 2.4, null, "net"));
+            var green = Color.FromRgb(0x30, 0xD1, 0x58);
+            var red = Color.FromRgb(0xFF, 0x45, 0x3A);
+            var orange = Color.FromRgb(0xFF, 0x9F, 0x0A);
+
+            if (!now.Connected)
+            {
+                // Uzildi: qaysi tarmoqdan uzilganini aytamiz
+                string from = prev.Kind == NetKind.None ? "Kompyuter oflayn" : prev.Label + " uzildi";
+                ShowAlert(new Alert(prev.Kind == NetKind.Ethernet ? "\uE839" : "\uE701", "Internet uzildi", from, red, 3.5, null, "net"));
+            }
+            else if (!now.Online)
+            {
+                ShowAlert(new Alert(now.Glyph, "Internet yo'q", now.Label + " ulangan, lekin internetga chiqmayapti", orange, 4, null, "net"));
+            }
+            else if (!prev.Online)
+            {
+                ShowAlert(new Alert(now.Glyph, "Internetga ulandi", now.Label, green, 3, null, "net"));
+            }
+            else
+            {
+                ShowAlert(new Alert(now.Glyph, "Tarmoq almashdi", now.Label, Color.FromRgb(0x0A, 0x84, 0xFF), 3, null, "net"));
+            }
         }
     }
 }

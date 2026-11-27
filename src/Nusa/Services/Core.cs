@@ -30,6 +30,7 @@ namespace Nusa.Services
         public VolumeWatcher Volume { get; } = new();
         public DownloadWatcher Downloads { get; }
         public QuickControls Controls { get; } = new();
+        public NetworkWatcher Network { get; }
         public WeatherService Weather { get; } = new();
         public ObservableCollection<ClipItem> Clips { get; } = new();
 
@@ -52,6 +53,7 @@ namespace Nusa.Services
             Media = new MediaService(ui);
             Media.TrackChanged += LoadLyrics;
             Downloads = new DownloadWatcher(ui);
+            Network = new NetworkWatcher(ui);
             Downloads.FileDownloaded += OnFileDownloaded;
             Downloads.ProgressChanged += () => DownloadsChanged?.Invoke();
 
@@ -64,6 +66,7 @@ namespace Nusa.Services
         public void Start()
         {
             _ = Media.InitAsync();
+            Network.Start();
             _lastWaterReminder = DateTime.Now;
             _timer.Start();
             ApplyDownloadSetting();

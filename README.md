@@ -20,6 +20,8 @@ Ekraningiz tepasida kichkina qora "orolcha" (iPhone'dagi Dynamic Island kabi). U
 | ⬇️ **Yuklanmalar** | Fayl yuklanayotganda notchda nomi, hajmi va tezligi ko'rinadi. Tugagach xabar chiqadi — bossangiz javonga qo'shiladi. |
 | ⚡ **Tez sozlamalar** | Wi‑Fi va Bluetooth'ni yoqish/o'chirish, ovozni o'chirish, ovoz va yorqinlik slayderlari, Windows sozlamalari. |
 | ⛅ **Ob-havo** | Shahringiz harorati, holati, kunlik eng yuqori/past — "Bugun" sahifasida (Open-Meteo, kalitsiz). |
+| 🌐 **Internet** | Ulanganda yoki uzilganda qaysi tarmoq orqali ekanini aytadi: "Wi‑Fi · Uy_tarmog'i", "Kabel (Ethernet)" yoki "Mobil internet". Tarmoq ulangan-u internet yo'q bo'lsa ham ogohlantiradi. |
+| 🔌 **Zaryadlash** | Zaryadlovchi ulanganda batareya rasmi va foizi bilan chiqadi, zaryadlanayotganda kompakt notchda "⚡ 82%" turadi, 100% bo'lganda xabar beradi. Uzilganda qancha vaqt yetishini aytadi. |
 | 🔔 **Tizim ko'rsatkichlari** | Ovoz balandligi, ekran yorqinligi, Caps Lock, klaviatura tili, zaryadlovchi ulandi/uzildi, batareya kam, internet uzildi. |
 
 Qo'shimcha: to'liq ekranli o'yin/video paytida yashirinadi, minimal (ingichka chiziq) rejim, sahifalarni yashirish va tartiblash, Windows bilan avtomatik ishga tushish. Tray (soat yonidagi) ikonkasini o'ng tugma bilan bosing — menyu chiqadi.

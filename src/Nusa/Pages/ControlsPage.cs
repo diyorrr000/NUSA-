@@ -111,6 +111,7 @@ namespace Nusa.Pages
         {
             C.Controls.RadiosChanged += OnRadios;
             C.Volume.VolumeChanged += OnVolumeExternal;
+            C.Network.Changed += OnNet;
             UpdateAll();
             UpdateVolume();
             // Yorqinlikni fon oqimida o'qiymiz (WMI sekin bo'lishi mumkin)
@@ -125,7 +126,10 @@ namespace Nusa.Pages
         {
             C.Controls.RadiosChanged -= OnRadios;
             C.Volume.VolumeChanged -= OnVolumeExternal;
+            C.Network.Changed -= OnNet;
         }
+
+        void OnNet(NetState a, NetState b) => UpdateAll();
 
         void OnRadios() => Dispatcher.BeginInvoke(UpdateAll);
         void OnVolumeExternal(float v, bool m) => Dispatcher.BeginInvoke(() => { if (!_volume.IsDragging) UpdateVolume(); });
@@ -137,6 +141,12 @@ namespace Nusa.Pages
             _wifi.btn.Background = C.Controls.WifiOn ? on : off;
             _bt.btn.Background = C.Controls.BluetoothOn ? on : off;
             _wifi.btn.Opacity = C.Controls.HasWifi ? 1 : 0.5;
+            // Qaysi tarmoqqa ulanganini ko'rsatamiz
+            var net = C.Network.Current;
+            _wifi.label.Text = net.Kind == NetKind.WiFi && !string.IsNullOrEmpty(net.Name) ? net.Name
+                : net.Kind == NetKind.Ethernet ? "Kabel" : "Wi-Fi";
+            _wifi.label.MaxWidth = 90;
+            _wifi.btn.ToolTip = net.Connected ? net.Label + (net.Online ? "" : " (internet yo'q)") : "Ulanmagan";
             _bt.btn.Opacity = C.Controls.HasBluetooth ? 1 : 0.5;
             bool muted = C.Volume.Muted;
             _mute.btn.Background = muted ? UI.Res("Red") : off;
