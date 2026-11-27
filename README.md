@@ -15,6 +15,8 @@ Ekraningiz tepasida kichkina qora "orolcha" (iPhone'dagi Dynamic Island kabi). U
 | 📋 **Bufer tarixi** | Nusxa olgan matnlaringiz (oxirgi 30 ta). Bosing — qayta nusxalanadi, yoki sudrab tashlang. Faqat xotirada saqlanadi. |
 | 🕌 **Namoz vaqtlari** | Internet kerak emas — kompyuterda hisoblanadi. O'zbekiston shaharlari, Hanafiy asr, quyosh yoyi, eslatma va musiqani avtomatik pauza qilish. |
 | 📅 **Bugun** | Hafta, batareya, keyingi namoz, suv, diqqat — bir qarashda. |
+| 🖥 **Tizim monitori** | Protsessor yuklanishi, xotira (RAM), internet tezligi (↓/↑) — so'nggi 60 soniya grafigi bilan; disklardagi bo'sh joy, kompyuter yoqilganiga qancha bo'lgani. Faqat sahifa ochiq turganda o'lchaydi. |
+| ⬇️ **Yuklab olingan fayllar** | Brauzer "Yuklanmalar" papkasiga faylni yuklab bo'lishi bilan notchda nomi va hajmi chiqadi. Bossangiz — javonga qo'shiladi, u yerdan ochasiz yoki chatga sudraysiz. |
 | 🔔 **Tizim ko'rsatkichlari** | Ovoz balandligi, Caps Lock, klaviatura tili, zaryadlovchi ulandi/uzildi, batareya kam, internet uzildi. |
 | 👀 **Maskot** | Kompyuter jim tursa, soat o'rniga ko'zchalar paydo bo'ladi, ko'z qisadi, uxlab qoladi va qaytganingizda qo'l silkitadi. |
 
@@ -54,12 +56,14 @@ src/Nusa/
   App.xaml(.cs)            ilova, tray menyusi, uslublar (ranglar, tugmalar)
   NotchWindow.xaml(.cs)    notchning o'zi: holatlar, animatsiya, ogohlantirishlar, maskot
   SettingsWindow.xaml(.cs) sozlamalar oynasi
-  Pages/                   notch sahifalari (Musiqa, Taymer, Vazifalar, Suv, Javon, Bufer, Namoz, Bugun)
+  Pages/                   notch sahifalari (Musiqa, Taymer, Vazifalar, Suv, Javon, Bufer, Namoz, Bugun, Tizim)
   Services/
     Core.cs                markaziy holat: pomodoro, suv, vazifalar, eslatmalar
     MediaService.cs        Windows media boshqaruvi (GlobalSystemMediaTransportControls)
     LyricsService.cs       LRCLIB'dan sinxron matn
     PrayerTimes.cs         namoz vaqtlarini astronomik hisoblash
     VolumeWatcher.cs       tizim ovozi (CoreAudio)
+    SystemMonitor.cs       CPU, RAM, internet tezligi, disklar
+    DownloadWatcher.cs     "Yuklanmalar" papkasini kuzatish
     Storage.cs             JSON saqlash
 ```

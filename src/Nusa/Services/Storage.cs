@@ -19,6 +19,7 @@ namespace Nusa.Services
         public bool ShowLyrics { get; set; } = true;
         public bool LyricsInNotch { get; set; } = true;
         public bool SystemOverlays { get; set; } = true; // ovoz, Caps Lock, til, batareya, internet
+        public bool DownloadAlerts { get; set; } = true;  // "Yuklanmalar" papkasiga yangi fayl tushganda
         public List<string> HiddenPages { get; set; } = new();
         public List<string> PageOrder { get; set; } = new();
 

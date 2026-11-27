@@ -30,6 +30,7 @@ namespace Nusa
             new("clip", "", "Bufer tarixi", () => new ClipboardPage()),
             new("prayer", "\U0001F54C", "Namoz vaqtlari", () => new PrayerPage()),
             new("today", "", "Bugun", () => new TodayPage()),
+            new("system", "\uE7F4", "Tizim monitori", () => new SystemPage()),
         };
 
         readonly Dictionary<string, NotchPage> _pageCache = new();
@@ -95,6 +96,7 @@ namespace Nusa
             C.SettingsChanged += OnSettingsChanged;
             C.AlertRaised += ShowAlert;
             C.MinuteTick += CheckPower;
+            C.ShowInShelf = _ => Expand("shelf");
 
             C.Volume.VolumeChanged += (v, muted) => Dispatcher.BeginInvoke(() => OnVolume(v, muted));
             C.Volume.Start();
@@ -410,7 +412,8 @@ namespace Nusa
         void Island_MouseEnter(object sender, MouseEventArgs e)
         {
             _leaveTimer.Stop();
-            if (!_expanded) _hoverTimer.Start();
+            // Bosiladigan ogohlantirish ko'rinib turganda hover bilan ochmaymiz — uni bosish mumkin bo'lsin
+            if (!_expanded && _currentAlert?.OnClick == null) _hoverTimer.Start();
         }
 
         void Island_MouseLeave(object sender, MouseEventArgs e)
@@ -421,6 +424,15 @@ namespace Nusa
 
         void Island_Click(object sender, MouseButtonEventArgs e)
         {
+            // Bosiladigan ogohlantirish (masalan, yuklab olingan fayl)
+            if (_currentAlert?.OnClick is Action act)
+            {
+                _hoverTimer.Stop();
+                _alertTimer.Stop();
+                act();
+                if (_currentAlert != null) EndAlert();
+                return;
+            }
             if (!_expanded) { _hoverTimer.Stop(); Expand(null); }
         }
 

@@ -7,7 +7,7 @@ using System.Windows.Threading;
 
 namespace Nusa.Services
 {
-    public sealed record Alert(string Glyph, string Title, string Subtitle, Color Accent, double Seconds = 3.2, double? Progress = null, string Kind = "");
+    public sealed record Alert(string Glyph, string Title, string Subtitle, Color Accent, double Seconds = 3.2, double? Progress = null, string Kind = "", Action? OnClick = null);
 
     public sealed class ClipItem
     {
@@ -28,6 +28,7 @@ namespace Nusa.Services
         public MediaService Media { get; }
         public LyricsService Lyrics { get; } = new();
         public VolumeWatcher Volume { get; } = new();
+        public DownloadWatcher Downloads { get; }
         public ObservableCollection<ClipItem> Clips { get; } = new();
 
         public event Action? Tick;            // har soniyada
@@ -48,6 +49,8 @@ namespace Nusa.Services
             Data = Storage.Load();
             Media = new MediaService(ui);
             Media.TrackChanged += LoadLyrics;
+            Downloads = new DownloadWatcher(ui);
+            Downloads.FileDownloaded += OnFileDownloaded;
 
             _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
             _timer.Tick += (_, _) => OnTick();
@@ -60,6 +63,35 @@ namespace Nusa.Services
             _ = Media.InitAsync();
             _lastWaterReminder = DateTime.Now;
             _timer.Start();
+            ApplyDownloadSetting();
+            SettingsChanged += ApplyDownloadSetting;
+        }
+
+        // ================= Yuklanmalar =================
+        /// <summary>Yuklangan faylni javonga qo'shib, javon sahifasini ochish uchun (NotchWindow belgilaydi).</summary>
+        public Action<string>? ShowInShelf { get; set; }
+
+        void ApplyDownloadSetting()
+        {
+            if (S.DownloadAlerts) Downloads.Start(); else Downloads.Stop();
+        }
+
+        void OnFileDownloaded(string path)
+        {
+            string size = "";
+            try
+            {
+                long b = new System.IO.FileInfo(path).Length;
+                size = b < 1024 * 1024 ? $"{Math.Max(1, b / 1024)} KB" : b < 1024L * 1024 * 1024 ? $"{b / 1048576.0:0.0} MB" : $"{b / 1073741824.0:0.00} GB";
+            }
+            catch { }
+            var name = System.IO.Path.GetFileName(path);
+            Raise(new Alert("\uE896", name, "Yuklab olindi" + (size.Length > 0 ? " · " + size : "") + " · bosing — javonga",
+                Color.FromRgb(0x0A, 0x84, 0xFF), 6, Kind: "download", OnClick: () =>
+                {
+                    if (!Data.Shelf.Contains(path, StringComparer.OrdinalIgnoreCase)) { Data.Shelf.Add(path); NotifyDataChanged(); }
+                    ShowInShelf?.Invoke(path);
+                }));
         }
 
         public void Save() { _saveTimer.Stop(); _saveTimer.Start(); }

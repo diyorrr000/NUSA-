@@ -74,6 +74,8 @@ namespace Nusa
                 () => C.S.HideInFullscreen, v => C.S.HideInFullscreen = v);
             Toggle("Tizim ko'rsatkichlari", "Ovoz, Caps Lock, klaviatura tili, quvvat va internet o'zgarganda qisqa ogohlantirish.",
                 () => C.S.SystemOverlays, v => C.S.SystemOverlays = v);
+            Toggle("Yuklab olingan fayllar", "\"Yuklanmalar\" papkasiga yangi fayl tushganda notchda ko'rsatadi. Bossangiz — javonga qo'shiladi.",
+                () => C.S.DownloadAlerts, v => C.S.DownloadAlerts = v);
 
             // ---------- Sahifalar ----------
             Section("pages", "Sahifalar");
