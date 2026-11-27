@@ -6,7 +6,7 @@ Ekraningiz tepasida kichkina qora "orolcha" (iPhone'dagi Dynamic Island kabi). U
 
 | | |
 |---|---|
-| 🤖 **Robotcha** | Kompakt notchda mitti robot yashaydi: siz ishlayotganda ko'zlari sichqonchani kuzatadi, 15 soniya hech kim tegmasa u yoq-bu yoqqa qarab turadi, ko'z qisadi, 5 daqiqadan so'ng uxlab qoladi, qaytsangiz qo'l silkitib salomlashadi. |
+| 🫧 **Jonzotcha** | Kompakt notchda ko'k nur sochib turadigan mitti jonzot yashaydi: siz ishlayotganda ko'zlari sichqonchani kuzatadi, 15 soniya hech kim tegmasa u yoq-bu yoqqa qarab turadi, ko'z qisadi, 5 daqiqadan so'ng uxlab qoladi, qaytsangiz jeledek sakrab salomlashadi. |
 | 🎵 **Musiqa** | Istalgan pleyer: Spotify, brauzerdagi YouTube, Apple Music, Yandex va h.k. Muqova, ijro/pauza, oldingi/keyingi, aralashtirish, takrorlash, vaqt chizig'ini surish. Yopiq notchda muqova va ko'kdan binafshaga tovlanadigan ovoz to'lqini. |
 | 🎤 **Sinxron qo'shiq matni** | Ochiq [LRCLIB](https://lrclib.net) bazasidan. Har bir qator aytilayotganda yonadi, qatorni bossangiz o'sha joyga o'tadi. Joriy qator yopiq notchda ham ko'rinadi. |
 | ⏱ **Diqqat taymeri (Pomodoro)** | 25/5, 50/10, 15/3 yoki o'zingizniki. Raundlar, uzun tanaffus, notchda qolgan vaqt halqasi, bugungi diqqat statistikasi. |
