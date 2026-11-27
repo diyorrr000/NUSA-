@@ -67,7 +67,7 @@ namespace Nusa
 
             _miStartup = new Forms.ToolStripMenuItem("Windows bilan ishga tushish") { CheckOnClick = true };
             _miStartup.Click += (_, _) => { _core!.S.StartWithWindows = _miStartup.Checked; AutoStart.Set(_miStartup.Checked); _core.NotifySettingsChanged(); };
-            _miMascot = new Forms.ToolStripMenuItem("Nusa maskoti (ko'zchalar)") { CheckOnClick = true };
+            _miMascot = new Forms.ToolStripMenuItem("Robotcha (maskot)") { CheckOnClick = true };
             _miMascot.Click += (_, _) => { _core!.S.Mascot = _miMascot.Checked; _core.NotifySettingsChanged(); };
             _miMinimal = new Forms.ToolStripMenuItem("Minimal notch (ingichka chiziq)") { CheckOnClick = true };
             _miMinimal.Click += (_, _) => { _core!.S.MinimalNotch = _miMinimal.Checked; _core.NotifySettingsChanged(); };

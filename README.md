@@ -6,7 +6,8 @@ Ekraningiz tepasida kichkina qora "orolcha" (iPhone'dagi Dynamic Island kabi). U
 
 | | |
 |---|---|
-| 🎵 **Musiqa** | Istalgan pleyer: Spotify, brauzerdagi YouTube, Apple Music, Yandex va h.k. Muqova, ijro/pauza, oldingi/keyingi, vaqt chizig'ini surish. Yopiq notchda muqova va "jonli" ekvalayzer. |
+| 🤖 **Robotcha** | Kompakt notchda mitti robot yashaydi: siz ishlayotganda ko'zlari sichqonchani kuzatadi, 15 soniya hech kim tegmasa u yoq-bu yoqqa qarab turadi, ko'z qisadi, 5 daqiqadan so'ng uxlab qoladi, qaytsangiz qo'l silkitib salomlashadi. |
+| 🎵 **Musiqa** | Istalgan pleyer: Spotify, brauzerdagi YouTube, Apple Music, Yandex va h.k. Muqova, ijro/pauza, oldingi/keyingi, aralashtirish, takrorlash, vaqt chizig'ini surish. Yopiq notchda muqova va ko'kdan binafshaga tovlanadigan ovoz to'lqini. |
 | 🎤 **Sinxron qo'shiq matni** | Ochiq [LRCLIB](https://lrclib.net) bazasidan. Har bir qator aytilayotganda yonadi, qatorni bossangiz o'sha joyga o'tadi. Joriy qator yopiq notchda ham ko'rinadi. |
 | ⏱ **Diqqat taymeri (Pomodoro)** | 25/5, 50/10, 15/3 yoki o'zingizniki. Raundlar, uzun tanaffus, notchda qolgan vaqt halqasi, bugungi diqqat statistikasi. |
 | ✅ **Vazifalar** | Vazifa yozing va vaqt bering (`14:30`, `1430`, `+15`) — notch o'z vaqtida eslatadi. |
@@ -15,10 +16,11 @@ Ekraningiz tepasida kichkina qora "orolcha" (iPhone'dagi Dynamic Island kabi). U
 | 📋 **Bufer tarixi** | Nusxa olgan matnlaringiz (oxirgi 30 ta). Bosing — qayta nusxalanadi, yoki sudrab tashlang. Faqat xotirada saqlanadi. |
 | 🕌 **Namoz vaqtlari** | Internet kerak emas — kompyuterda hisoblanadi. O'zbekiston shaharlari, Hanafiy asr, quyosh yoyi, eslatma va musiqani avtomatik pauza qilish. |
 | 📅 **Bugun** | Hafta, batareya, keyingi namoz, suv, diqqat — bir qarashda. |
-| 🖥 **Tizim monitori** | Protsessor yuklanishi, xotira (RAM), internet tezligi (↓/↑) — so'nggi 60 soniya grafigi bilan; disklardagi bo'sh joy, kompyuter yoqilganiga qancha bo'lgani. Faqat sahifa ochiq turganda o'lchaydi. |
-| ⬇️ **Yuklab olingan fayllar** | Brauzer "Yuklanmalar" papkasiga faylni yuklab bo'lishi bilan notchda nomi va hajmi chiqadi. Bossangiz — javonga qo'shiladi, u yerdan ochasiz yoki chatga sudraysiz. |
-| 🔔 **Tizim ko'rsatkichlari** | Ovoz balandligi, Caps Lock, klaviatura tili, zaryadlovchi ulandi/uzildi, batareya kam, internet uzildi. |
-| 👀 **Maskot** | Kompyuter jim tursa, soat o'rniga ko'zchalar paydo bo'ladi, ko'z qisadi, uxlab qoladi va qaytganingizda qo'l silkitadi. |
+| 🖥 **Tizim monitori** | CPU, RAM, GPU va internet tezligi (↓/↑) — so'nggi 60 soniya grafigi bilan; batareya va qolgan vaqt, disklardagi bo'sh joy. Faqat sahifa ochiq turganda o'lchaydi. |
+| ⬇️ **Yuklanmalar** | Fayl yuklanayotganda notchda nomi, hajmi va tezligi ko'rinadi. Tugagach xabar chiqadi — bossangiz javonga qo'shiladi. |
+| ⚡ **Tez sozlamalar** | Wi‑Fi va Bluetooth'ni yoqish/o'chirish, ovozni o'chirish, ovoz va yorqinlik slayderlari, Windows sozlamalari. |
+| ⛅ **Ob-havo** | Shahringiz harorati, holati, kunlik eng yuqori/past — "Bugun" sahifasida (Open-Meteo, kalitsiz). |
+| 🔔 **Tizim ko'rsatkichlari** | Ovoz balandligi, ekran yorqinligi, Caps Lock, klaviatura tili, zaryadlovchi ulandi/uzildi, batareya kam, internet uzildi. |
 
 Qo'shimcha: to'liq ekranli o'yin/video paytida yashirinadi, minimal (ingichka chiziq) rejim, sahifalarni yashirish va tartiblash, Windows bilan avtomatik ishga tushish. Tray (soat yonidagi) ikonkasini o'ng tugma bilan bosing — menyu chiqadi.
 
@@ -56,7 +58,7 @@ src/Nusa/
   App.xaml(.cs)            ilova, tray menyusi, uslublar (ranglar, tugmalar)
   NotchWindow.xaml(.cs)    notchning o'zi: holatlar, animatsiya, ogohlantirishlar, maskot
   SettingsWindow.xaml(.cs) sozlamalar oynasi
-  Pages/                   notch sahifalari (Musiqa, Taymer, Vazifalar, Suv, Javon, Bufer, Namoz, Bugun, Tizim)
+  Pages/                   notch sahifalari (Musiqa, Taymer, Vazifalar, Suv, Javon, Bufer, Namoz, Bugun, Tez sozlamalar, Tizim)
   Services/
     Core.cs                markaziy holat: pomodoro, suv, vazifalar, eslatmalar
     MediaService.cs        Windows media boshqaruvi (GlobalSystemMediaTransportControls)

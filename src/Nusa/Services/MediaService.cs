@@ -31,6 +31,11 @@ namespace Nusa.Services
         public ImageSource? Art { get; private set; }
         public Color ArtColor { get; private set; } = Color.FromRgb(0x0A, 0x84, 0xFF);
         public bool IsPlaying { get; private set; }
+        public bool Shuffle { get; private set; }
+        public bool CanShuffle { get; private set; }
+        public bool CanRepeat { get; private set; }
+        /// <summary>0 = yo'q, 1 = bitta qo'shiq, 2 = hammasi</summary>
+        public int Repeat { get; private set; }
         public TimeSpan Duration { get; private set; }
 
         TimeSpan _position;
@@ -156,6 +161,15 @@ namespace Nusa.Services
                 _position = Position;
                 _positionStamp = DateTimeOffset.Now;
                 IsPlaying = info?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+                Shuffle = info?.IsShuffleActive == true;
+                Repeat = info?.AutoRepeatMode switch
+                {
+                    Windows.Media.MediaPlaybackAutoRepeatMode.Track => 1,
+                    Windows.Media.MediaPlaybackAutoRepeatMode.List => 2,
+                    _ => 0,
+                };
+                CanShuffle = info?.Controls?.IsShuffleEnabled == true;
+                CanRepeat = info?.Controls?.IsRepeatEnabled == true;
                 Changed?.Invoke();
             }
             catch { }
@@ -182,6 +196,28 @@ namespace Nusa.Services
         public async void Pause() { try { if (_session != null && IsPlaying) await _session.TryPauseAsync(); } catch { } }
         public async void Next() { try { if (_session != null) await _session.TrySkipNextAsync(); } catch { } }
         public async void Previous() { try { if (_session != null) await _session.TrySkipPreviousAsync(); } catch { } }
+
+        public async void ToggleShuffle()
+        {
+            try { if (_session != null) await _session.TryChangeShuffleActiveAsync(!Shuffle); } catch { }
+        }
+
+        /// <summary>Yo'q → hammasi → bitta qo'shiq → yo'q</summary>
+        public async void CycleRepeat()
+        {
+            try
+            {
+                if (_session == null) return;
+                var next = Repeat switch
+                {
+                    0 => Windows.Media.MediaPlaybackAutoRepeatMode.List,
+                    2 => Windows.Media.MediaPlaybackAutoRepeatMode.Track,
+                    _ => Windows.Media.MediaPlaybackAutoRepeatMode.None,
+                };
+                await _session.TryChangeAutoRepeatModeAsync(next);
+            }
+            catch { }
+        }
 
         public async void Seek(TimeSpan pos)
         {

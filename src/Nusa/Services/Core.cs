@@ -29,6 +29,8 @@ namespace Nusa.Services
         public LyricsService Lyrics { get; } = new();
         public VolumeWatcher Volume { get; } = new();
         public DownloadWatcher Downloads { get; }
+        public QuickControls Controls { get; } = new();
+        public WeatherService Weather { get; } = new();
         public ObservableCollection<ClipItem> Clips { get; } = new();
 
         public event Action? Tick;            // har soniyada
@@ -51,6 +53,7 @@ namespace Nusa.Services
             Media.TrackChanged += LoadLyrics;
             Downloads = new DownloadWatcher(ui);
             Downloads.FileDownloaded += OnFileDownloaded;
+            Downloads.ProgressChanged += () => DownloadsChanged?.Invoke();
 
             _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
             _timer.Tick += (_, _) => OnTick();
@@ -65,9 +68,25 @@ namespace Nusa.Services
             _timer.Start();
             ApplyDownloadSetting();
             SettingsChanged += ApplyDownloadSetting;
+            _ = Weather.RefreshAsync(S.Latitude, S.Longitude);
+            MinuteTick += () => _ = Weather.RefreshAsync(S.Latitude, S.Longitude);
+            double lat = S.Latitude, lon = S.Longitude;
+            SettingsChanged += () =>
+            {
+                // Shahar o'zgarsa ob-havoni darhol yangilaymiz
+                if (lat != S.Latitude || lon != S.Longitude)
+                {
+                    lat = S.Latitude; lon = S.Longitude;
+                    _ = Weather.RefreshAsync(lat, lon, force: true);
+                }
+            };
         }
 
         // ================= Yuklanmalar =================
+        public event Action? DownloadsChanged;
+        public ActiveDownload? ActiveDownload => Downloads.Active.Count > 0 ? Downloads.Active[0] : null;
+        public int ActiveDownloadCount => Downloads.Active.Count;
+
         /// <summary>Yuklangan faylni javonga qo'shib, javon sahifasini ochish uchun (NotchWindow belgilaydi).</summary>
         public Action<string>? ShowInShelf { get; set; }
 

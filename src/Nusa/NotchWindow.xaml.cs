@@ -10,6 +10,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Microsoft.Win32;
+using Nusa.Controls;
 using Nusa.Pages;
 using Nusa.Services;
 
@@ -30,6 +31,7 @@ namespace Nusa
             new("clip", "", "Bufer tarixi", () => new ClipboardPage()),
             new("prayer", "\U0001F54C", "Namoz vaqtlari", () => new PrayerPage()),
             new("today", "", "Bugun", () => new TodayPage()),
+            new("controls", "\uE701", "Tez sozlamalar", () => new ControlsPage()),
             new("system", "\uE7F4", "Tizim monitori", () => new SystemPage()),
         };
 
@@ -39,7 +41,7 @@ namespace Nusa
 
         Core C => Core.I;
 
-        enum Mode { Idle, Mascot, Music, Timer, Alert, Expanded, Hidden }
+        enum Mode { Idle, Music, Timer, Download, Alert, Expanded, Hidden }
         Mode _mode = Mode.Idle;
         bool _expanded;
         bool _dragOver;
@@ -50,7 +52,6 @@ namespace Nusa
         readonly DispatcherTimer _barsTimer = new() { Interval = TimeSpan.FromMilliseconds(170) };
         readonly DispatcherTimer _lyricTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
         readonly DispatcherTimer _sysTimer = new(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(300) };
-        readonly DispatcherTimer _blinkTimer = new();
         readonly Random _rnd = new();
 
         readonly Queue<Alert> _alerts = new();
@@ -77,7 +78,6 @@ namespace Nusa
             _barsTimer.Tick += (_, _) => AnimateBars();
             _lyricTimer.Tick += (_, _) => UpdateMiniLyric();
             _sysTimer.Tick += (_, _) => CheckKeys();
-            _blinkTimer.Tick += (_, _) => Blink();
 
             Island.DragOver += (_, e) =>
             {
@@ -100,6 +100,7 @@ namespace Nusa
 
             C.Volume.VolumeChanged += (v, muted) => Dispatcher.BeginInvoke(() => OnVolume(v, muted));
             C.Volume.Start();
+            C.Controls.WatchBrightness(b => Dispatcher.BeginInvoke(() => OnBrightness(b)));
 
             SystemEvents.DisplaySettingsChanged += (_, _) => Dispatcher.BeginInvoke(PositionWindow);
             SystemEvents.PowerModeChanged += (_, e) => { if (e.Mode == PowerModes.StatusChange) Dispatcher.BeginInvoke(CheckPower); };
@@ -110,7 +111,9 @@ namespace Nusa
 
             BuildTabs();
             if (C.S.SystemOverlays) _sysTimer.Start();
-            ScheduleBlink();
+            C.DownloadsChanged += Refresh;
+            C.DataChanged += Refresh;
+            BuildBars();
         }
 
         // =====================================================================
@@ -181,7 +184,7 @@ namespace Nusa
                 if (Visibility != vis) Visibility = vis;
             }
 
-            UpdateMascot();
+            UpdateRobot();
             if (_mode == Mode.Timer) UpdateMiniTimer();
         }
 
@@ -201,8 +204,8 @@ namespace Nusa
 
             Mode m;
             if (C.PomodoroActive) m = Mode.Timer;
+            else if (C.ActiveDownload != null) m = Mode.Download;
             else if (C.Media.HasSession && C.Media.IsPlaying) m = Mode.Music;
-            else if (_mascot != MascotState.None && C.S.Mascot) m = Mode.Mascot;
             else m = Mode.Idle;
 
             _mode = m;
@@ -214,16 +217,22 @@ namespace Nusa
 
         void UpdateMiniContent()
         {
-            MiniClock.Visibility = _mode == Mode.Idle && C.S.ShowClock && !C.S.MinimalNotch ? Visibility.Visible : Visibility.Collapsed;
+            bool idle = _mode == Mode.Idle;
+            bool minimal = C.S.MinimalNotch;
+            IdleView.Visibility = idle && !minimal ? Visibility.Visible : Visibility.Collapsed;
+            RobotView.Visibility = C.S.Mascot ? Visibility.Visible : Visibility.Collapsed;
+            MiniClock.Visibility = C.S.ShowClock ? Visibility.Visible : Visibility.Collapsed;
+            var today = DateTime.Today;
+            BellDot.Visibility = C.Data.Todos.Any(t => !t.Done && t.RemindAt != null && t.RemindAt.Value.Date <= today)
+                ? Visibility.Visible : Visibility.Collapsed;
             MiniMusic.Visibility = _mode == Mode.Music ? Visibility.Visible : Visibility.Collapsed;
             MiniTimer.Visibility = _mode == Mode.Timer ? Visibility.Visible : Visibility.Collapsed;
-            MascotView.Visibility = _mode == Mode.Mascot ? Visibility.Visible : Visibility.Collapsed;
+            MiniDownload.Visibility = _mode == Mode.Download ? Visibility.Visible : Visibility.Collapsed;
+            if (_mode == Mode.Download) UpdateMiniDownload();
 
             if (_mode == Mode.Music)
             {
                 MiniArt.Source = C.Media.Art;
-                var b = UI.Br(C.Media.ArtColor);
-                Bar1.Fill = Bar2.Fill = Bar3.Fill = Bar4.Fill = b;
                 MiniLyric.Visibility = LyricInNotch ? Visibility.Visible : Visibility.Collapsed;
                 UpdateMiniLyric();
             }
@@ -247,15 +256,21 @@ namespace Nusa
             {
                 case Mode.Music: w = LyricInNotch ? 460 : 236; break;
                 case Mode.Timer: w = 236; break;
-                case Mode.Mascot: w = 150; break;
+                case Mode.Download: w = 330; break;
                 default:
                     if (minimal) { w = 180; h = 6; r = 3; }
-                    else w = C.S.ShowClock ? 150 : 120;
+                    else w = 64 + (C.S.Mascot ? 40 : 0) + (C.S.ShowClock ? 70 : 0);
                     break;
             }
             SetEars(!(minimal && _mode == Mode.Idle));
+            if (_lastCollapsed == (w, h) && !_sizeDirty) return; // o'lcham o'zgarmagan — qayta animatsiya shart emas
+            _lastCollapsed = (w, h);
+            _sizeDirty = false;
             AnimateIsland(w, h, r, 0.42);
         }
+
+        (double, double) _lastCollapsed;
+        bool _sizeDirty = true;
 
         void SetEars(bool on)
         {
@@ -264,6 +279,7 @@ namespace Nusa
 
         void AnimateIsland(double w, double h, double r, double seconds, bool bouncy = true)
         {
+            if ((w, h) != _lastCollapsed) _sizeDirty = true;
             IEasingFunction ease = bouncy
                 ? new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.22 }
                 : new CubicEase { EasingMode = EasingMode.EaseOut };
@@ -287,16 +303,46 @@ namespace Nusa
         // =====================================================================
         // Mini ko'rinishlar
         // =====================================================================
+        // Ovoz to'lqini: 7 ta ustuncha, ko'kdan binafshaga
+        readonly List<System.Windows.Shapes.Rectangle> _bars = new();
+        static readonly double[] BarShape = { 0.45, 0.75, 1.0, 0.85, 1.0, 0.7, 0.4 };
+
+        void BuildBars()
+        {
+            var from = Color.FromRgb(0x5A, 0xC8, 0xFA);
+            var to = Color.FromRgb(0xBF, 0x5A, 0xF2);
+            for (int i = 0; i < 7; i++)
+            {
+                double k = i / 6.0;
+                var c = Color.FromRgb((byte)(from.R + (to.R - from.R) * k), (byte)(from.G + (to.G - from.G) * k), (byte)(from.B + (to.B - from.B) * k));
+                var r = new System.Windows.Shapes.Rectangle
+                {
+                    Width = 2.6, Height = 4 + 10 * BarShape[i], RadiusX = 1.3, RadiusY = 1.3,
+                    Margin = new Thickness(0.9, 0, 0.9, 0), VerticalAlignment = VerticalAlignment.Center, Fill = UI.Br(c),
+                };
+                _bars.Add(r);
+                Bars.Children.Add(r);
+            }
+        }
+
         void AnimateBars()
         {
-            foreach (var bar in new[] { Bar1, Bar2, Bar3, Bar4 })
+            for (int i = 0; i < _bars.Count; i++)
             {
-                double target = 4 + _rnd.NextDouble() * 12;
-                bar.BeginAnimation(HeightProperty, new DoubleAnimation(target, TimeSpan.FromMilliseconds(160))
+                double target = 3 + (4 + _rnd.NextDouble() * 11) * (0.55 + 0.45 * BarShape[i]);
+                _bars[i].BeginAnimation(HeightProperty, new DoubleAnimation(target, TimeSpan.FromMilliseconds(160))
                 {
                     EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
                 });
             }
+        }
+
+        void UpdateMiniDownload()
+        {
+            var d = C.ActiveDownload;
+            if (d == null) return;
+            MiniDownloadName.Text = C.ActiveDownloadCount > 1 ? $"{d.Name} (+{C.ActiveDownloadCount - 1})" : d.Name;
+            MiniDownloadInfo.Text = $"{DownloadWatcher.FormatSize(d.Bytes)} · {DownloadWatcher.FormatSize((long)d.BytesPerSec)}/s";
         }
 
         int _miniLyricIndex = -2;
@@ -325,85 +371,42 @@ namespace Nusa
         }
 
         // =====================================================================
-        // Maskot (ko'zchalar)
+        // Robotcha
+        //   foydalanuvchi faol      → ko'zlari sichqonchani kuzatadi
+        //   15 soniya hech kim tegmasa → u yoq-bu yoqqa qarab turadi
+        //   5 daqiqa jimlik         → uxlab qoladi
+        //   qaytib kelsangiz        → qo'l silkitib salomlashadi
         // =====================================================================
-        enum MascotState { None, Awake, Sleep, Wave }
-        MascotState _mascot = MascotState.None;
         DateTime _waveUntil;
+        bool _wasAway;
 
-        void UpdateMascot()
+        void UpdateRobot()
         {
-            if (!C.S.Mascot) { SetMascot(MascotState.None); return; }
-            bool busy = C.PomodoroActive || (C.Media.HasSession && C.Media.IsPlaying);
+            if (!C.S.Mascot || !RobotView.IsVisible) return;
             var idle = Native.IdleTime();
 
-            if (_mascot == MascotState.Wave)
+            if (RobotView.Mode == RobotMode.Wave)
             {
-                if (DateTime.Now >= _waveUntil) SetMascot(MascotState.None);
+                if (DateTime.Now >= _waveUntil) RobotView.Mode = RobotMode.Follow;
                 return;
             }
-            if (busy) { SetMascot(MascotState.None); return; }
-
             if (idle.TotalSeconds < 2)
             {
-                if (_mascot == MascotState.Sleep || _mascot == MascotState.Awake)
+                if (_wasAway)
                 {
-                    _waveUntil = DateTime.Now.AddSeconds(2.6);
-                    SetMascot(MascotState.Wave);
+                    _wasAway = false;
+                    _waveUntil = DateTime.Now.AddSeconds(2.8);
+                    RobotView.Mode = RobotMode.Wave;
                 }
+                else RobotView.Mode = RobotMode.Follow;
                 return;
             }
-            if (idle.TotalMinutes >= 4) SetMascot(MascotState.Sleep);
-            else if (idle.TotalSeconds >= 45) SetMascot(MascotState.Awake);
-        }
-
-        void SetMascot(MascotState s)
-        {
-            if (_mascot == s) return;
-            _mascot = s;
-            Zzz.Visibility = s == MascotState.Sleep ? Visibility.Visible : Visibility.Collapsed;
-            Wave.Visibility = s == MascotState.Wave ? Visibility.Visible : Visibility.Collapsed;
-
-            double eyeScale = s == MascotState.Sleep ? 0.15 : 1;
-            EyeLScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(eyeScale, TimeSpan.FromMilliseconds(400)));
-            EyeRScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(eyeScale, TimeSpan.FromMilliseconds(400)));
-
-            if (s == MascotState.Sleep)
+            if (idle.TotalMinutes >= 5) { RobotView.Mode = RobotMode.Sleep; _wasAway = true; }
+            else if (idle.TotalSeconds >= 15)
             {
-                var floatAnim = new DoubleAnimation(0.2, 1, TimeSpan.FromSeconds(1.4)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever };
-                Zzz.BeginAnimation(OpacityProperty, floatAnim);
+                RobotView.Mode = RobotMode.Wander;
+                if (idle.TotalSeconds >= 60) _wasAway = true;
             }
-            else Zzz.BeginAnimation(OpacityProperty, null);
-
-            if (s == MascotState.Wave)
-            {
-                var rot = new DoubleAnimation(-18, 22, TimeSpan.FromMilliseconds(260)) { AutoReverse = true, RepeatBehavior = new RepeatBehavior(4) };
-                WaveRotate.BeginAnimation(RotateTransform.AngleProperty, rot);
-            }
-            else WaveRotate.BeginAnimation(RotateTransform.AngleProperty, null);
-
-            Refresh();
-        }
-
-        void ScheduleBlink()
-        {
-            _blinkTimer.Interval = TimeSpan.FromSeconds(2.5 + _rnd.NextDouble() * 4);
-            _blinkTimer.Start();
-        }
-
-        void Blink()
-        {
-            _blinkTimer.Stop();
-            if (_mascot == MascotState.Awake || _mascot == MascotState.Wave)
-            {
-                if (_mode == Mode.Mascot && !_expanded)
-                {
-                    var a = new DoubleAnimation(1, 0.1, TimeSpan.FromMilliseconds(90)) { AutoReverse = true };
-                    EyeLScale.BeginAnimation(ScaleTransform.ScaleYProperty, a);
-                    EyeRScale.BeginAnimation(ScaleTransform.ScaleYProperty, a.Clone());
-                }
-            }
-            ScheduleBlink();
         }
 
         // =====================================================================
@@ -610,7 +613,7 @@ namespace Nusa
         // =====================================================================
         // Ogohlantirishlar (alert)
         // =====================================================================
-        static bool IsSystemKind(string k) => k is "volume" or "caps" or "lang" or "power" or "net";
+        static bool IsSystemKind(string k) => k is "volume" or "brightness" or "caps" or "lang" or "power" or "net";
 
         public void ShowAlert(Alert a)
         {
@@ -706,6 +709,12 @@ namespace Nusa
             int pct = (int)Math.Round(v * 100);
             ShowAlert(new Alert(muted || pct == 0 ? "" : "", muted ? "Ovoz o'chirilgan" : $"Ovoz  {pct}%", "",
                 Colors.White, 1.6, muted ? 0 : v, "volume"));
+        }
+
+        void OnBrightness(int percent)
+        {
+            if (!C.S.SystemOverlays || (DateTime.Now - _startedAt).TotalSeconds < 3) return;
+            ShowAlert(new Alert("\uE706", $"Yorqinlik  {percent}%", "", Color.FromRgb(0xFF, 0xD6, 0x0A), 1.6, percent / 100.0, "brightness"));
         }
 
         bool _lastCaps;

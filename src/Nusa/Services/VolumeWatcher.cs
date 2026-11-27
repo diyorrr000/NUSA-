@@ -52,6 +52,19 @@ namespace Nusa.Services
             catch { }
         }
 
+        public bool Muted
+        {
+            get
+            {
+                try { if (_endpoint != null && _endpoint.GetMute(out var m) == 0) return m; } catch { }
+                return false;
+            }
+            set
+            {
+                try { var g = Guid.Empty; _endpoint?.SetMute(value, ref g); } catch { }
+            }
+        }
+
         internal void Raise(float v, bool muted) => VolumeChanged?.Invoke(v, muted);
 
         public void Dispose()
@@ -107,6 +120,12 @@ namespace Nusa.Services
             [PreserveSig] int SetMasterVolumeLevelScalar(float level, ref Guid ctx);
             [PreserveSig] int GetMasterVolumeLevel(out float levelDb);
             [PreserveSig] int GetMasterVolumeLevelScalar(out float level);
+            [PreserveSig] int SetChannelVolumeLevel(uint channel, float levelDb, ref Guid ctx);
+            [PreserveSig] int SetChannelVolumeLevelScalar(uint channel, float level, ref Guid ctx);
+            [PreserveSig] int GetChannelVolumeLevel(uint channel, out float levelDb);
+            [PreserveSig] int GetChannelVolumeLevelScalar(uint channel, out float level);
+            [PreserveSig] int SetMute([MarshalAs(UnmanagedType.Bool)] bool mute, ref Guid ctx);
+            [PreserveSig] int GetMute([MarshalAs(UnmanagedType.Bool)] out bool mute);
         }
 
         [ComImport, Guid("657804FA-D6AD-4496-8A60-352752AF4F89"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]

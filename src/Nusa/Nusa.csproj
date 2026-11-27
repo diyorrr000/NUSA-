@@ -23,4 +23,9 @@
     <Resource Include="Assets\nusa.ico" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Ekran yorqinligi (WMI) uchun -->
+    <PackageReference Include="System.Management" Version="8.0.0" />
+  </ItemGroup>
+
 </Project>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -11,61 +12,63 @@ using Nusa.Services;
 
 namespace Nusa.Pages
 {
-    /// <summary>Tizim monitori: CPU, xotira, internet tezligi va disklar.</summary>
+    /// <summary>Tizim monitori: CPU, RAM, GPU, internet tezligi, batareya va disklar.</summary>
     public sealed class SystemPage : NotchPage
     {
         readonly SystemMonitor _mon = new();
         readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(1) };
+        bool _sampling;
 
-        readonly TextBlock _cpuValue = UI.Text("0%", 20, FontWeights.SemiBold);
-        readonly TextBlock _memValue = UI.Text("0%", 20, FontWeights.SemiBold);
-        readonly TextBlock _memSub = UI.Sub("", 11.5);
-        readonly TextBlock _down = UI.Text("", 14, FontWeights.SemiBold);
-        readonly TextBlock _up = UI.Text("", 12.5);
-        readonly Canvas _cpuGraph = new() { Height = 42, ClipToBounds = true };
-        readonly Canvas _memGraph = new() { Height = 42, ClipToBounds = true };
-        readonly Canvas _netGraph = new() { Height = 42, ClipToBounds = true };
-        readonly StackPanel _drives = new();
-        readonly TextBlock _uptime = UI.Sub("", 11.5);
+        readonly TextBlock _cpuValue = UI.Text("0%", 19, FontWeights.SemiBold);
+        readonly TextBlock _memValue = UI.Text("0%", 19, FontWeights.SemiBold);
+        readonly TextBlock _memSub = UI.Sub("", 11);
+        readonly TextBlock _gpuValue = UI.Text("—", 19, FontWeights.SemiBold);
+        readonly TextBlock _down = UI.Text("", 13.5, FontWeights.SemiBold);
+        readonly TextBlock _up = UI.Text("", 12);
+        readonly Canvas _cpuGraph = new() { Height = 34, ClipToBounds = true };
+        readonly Canvas _memGraph = new() { Height = 34, ClipToBounds = true };
+        readonly Canvas _gpuGraph = new() { Height = 34, ClipToBounds = true };
+        readonly Canvas _netGraph = new() { Height = 34, ClipToBounds = true };
+        readonly StackPanel _bottom = new() { Orientation = Orientation.Horizontal };
 
-        static readonly Color CpuColor = Color.FromRgb(0xFF, 0x9F, 0x0A);
-        static readonly Color MemColor = Color.FromRgb(0xBF, 0x5A, 0xF2);
+        static readonly Color CpuColor = Color.FromRgb(0x30, 0xD1, 0x58);
+        static readonly Color MemColor = Color.FromRgb(0x0A, 0x84, 0xFF);
+        static readonly Color GpuColor = Color.FromRgb(0xBF, 0x5A, 0xF2);
         static readonly Color DownColor = Color.FromRgb(0x64, 0xD2, 0xFF);
-        static readonly Color UpColor = Color.FromRgb(0x30, 0xD1, 0x58);
+        static readonly Color UpColor = Color.FromRgb(0xFF, 0x9F, 0x0A);
 
         public SystemPage()
         {
             _up.Foreground = UI.Br(UpColor);
             _down.Foreground = UI.Br(DownColor);
 
-            var cpu = Card("PROTSESSOR", UI.Col(_cpuValue, UI.Sub("yuklanish", 11.5)), _cpuGraph);
-            var mem = Card("XOTIRA (RAM)", UI.Col(_memValue, _memSub), _memGraph);
-            var net = Card("INTERNET", UI.Col(UI.Row(UI.Text("↓ ", 14, FontWeights.SemiBold, UI.Br(DownColor)), _down),
-                                             UI.Row(UI.Text("↑ ", 12.5, null, UI.Br(UpColor)), _up)), _netGraph);
-            var disk = UI.Card(UI.Col(UI.Sub("DISKLAR", 10.5), _drives.M(0, 6, 0, 0), _uptime.M(0, 6, 0, 0)), 12, 14);
-            disk.Margin = new Thickness(4, 0, 4, 0);
+            var cards = new UniformGrid { Columns = 4, Rows = 1, Margin = new Thickness(-4, 0, -4, 0) };
+            cards.Children.Add(Card("CPU", UI.Col(_cpuValue, UI.Sub("protsessor", 11)), _cpuGraph));
+            cards.Children.Add(Card("RAM", UI.Col(_memValue, _memSub), _memGraph));
+            cards.Children.Add(Card("GPU", UI.Col(_gpuValue, UI.Sub("videokarta", 11)), _gpuGraph));
+            cards.Children.Add(Card("INTERNET", UI.Col(
+                UI.Row(UI.Text("↓ ", 13.5, FontWeights.SemiBold, UI.Br(DownColor)), _down),
+                UI.Row(UI.Text("↑ ", 12, null, UI.Br(UpColor)), _up)), _netGraph));
 
-            var grid = new UniformGrid { Columns = 4, Rows = 1, Margin = new Thickness(-4, 0, -4, 0) };
-            grid.Children.Add(cpu);
-            grid.Children.Add(mem);
-            grid.Children.Add(net);
-            grid.Children.Add(disk);
-            Content = grid;
+            var bottomCard = UI.Card(_bottom, 10, 14);
+            bottomCard.Padding = new Thickness(14, 8, 14, 8);
 
-            _timer.Tick += (_, _) => Update();
+            var root = UI.Rows("*", "auto");
+            root.Children.Add(cards);
+            root.Children.Add(bottomCard.At(0, 1).M(0, 8, 0, 0));
+            Content = root;
+
+            _timer.Tick += (_, _) => Tick();
         }
 
-        public override double PreferredHeight => 176;
+        public override double PreferredHeight => 206;
 
         static Border Card(string label, UIElement value, Canvas graph)
         {
-            var col = new Grid();
-            col.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            col.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            col.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            var col = UI.Rows("auto", "auto", "*");
             col.Children.Add(UI.Sub(label, 10.5));
-            col.Children.Add(((FrameworkElement)value).At(0, 1).M(0, 4, 0, 0));
-            col.Children.Add(graph.At(0, 2).M(0, 8, 0, 0).Align(HorizontalAlignment.Stretch, VerticalAlignment.Bottom));
+            col.Children.Add(((FrameworkElement)value).At(0, 1).M(0, 3, 0, 0));
+            col.Children.Add(graph.At(0, 2).M(0, 6, 0, 0).Align(HorizontalAlignment.Stretch, VerticalAlignment.Bottom));
             var card = UI.Card(col, 12, 14);
             card.Margin = new Thickness(4, 0, 4, 0);
             return card;
@@ -73,51 +76,84 @@ namespace Nusa.Pages
 
         public override void OnShown()
         {
-            _mon.Sample(); // boshlang'ich qiymatlar
-            Update();
+            UpdateBottom();
+            Tick();
             _timer.Start();
         }
 
         public override void OnHidden() => _timer.Stop();
 
-        void Update()
+        int _ticks;
+
+        /// <summary>O'lchash fon oqimida bajariladi — notch animatsiyalari to'xtab qolmasin.</summary>
+        void Tick()
         {
-            var s = _mon.Sample();
+            if (++_ticks % 10 == 0) UpdateBottom();
+            if (_sampling) return;
+            _sampling = true;
+            Task.Run(() => _mon.Sample()).ContinueWith(t =>
+            {
+                _sampling = false;
+                if (t.IsCompletedSuccessfully && IsVisible) Render(t.Result);
+            }, TaskScheduler.FromCurrentSynchronizationContext());
+        }
+
+        void Render(SystemSample s)
+        {
             _cpuValue.Text = $"{s.Cpu * 100:0}%";
             double memPct = s.MemTotalGb > 0 ? s.MemUsedGb / s.MemTotalGb : 0;
             _memValue.Text = $"{memPct * 100:0}%";
-            _memSub.Text = $"{s.MemUsedGb:0.0} / {s.MemTotalGb:0.0} GB";
+            _memSub.Text = $"{s.MemUsedGb:0.0} / {s.MemTotalGb:0} GB";
+            _gpuValue.Text = s.Gpu.HasValue ? $"{s.Gpu.Value * 100:0}%" : "—";
             _down.Text = SystemMonitor.Speed(s.DownBytesPerSec);
             _up.Text = SystemMonitor.Speed(s.UpBytesPerSec);
 
             DrawSpark(_cpuGraph, _mon.CpuHistory, 1.0, CpuColor);
             DrawSpark(_memGraph, _mon.MemHistory, 1.0, MemColor);
+            DrawSpark(_gpuGraph, _mon.GpuHistory, 1.0, GpuColor);
             double netMax = Math.Max(16 * 1024, Math.Max(_mon.DownHistory.DefaultIfEmpty(0).Max(), _mon.UpHistory.DefaultIfEmpty(0).Max()));
             DrawSpark(_netGraph, _mon.DownHistory, netMax, DownColor);
             DrawSpark(_netGraph, _mon.UpHistory, netMax, UpColor, clear: false, fill: false);
-
-            // Disklar har 10 soniyada yangilanadi
-            if (_drives.Children.Count == 0 || DateTime.Now.Second % 10 == 0) UpdateDrives();
-            var up = SystemMonitor.Uptime;
-            _uptime.Text = up.TotalDays >= 1
-                ? $"Yoqilganiga: {(int)up.TotalDays} kun {up.Hours} soat"
-                : $"Yoqilganiga: {up.Hours} soat {up.Minutes} daq";
         }
 
-        void UpdateDrives()
+        /// <summary>Pastki qator: batareya · disklar · yoqilganiga qancha bo'lgani.</summary>
+        void UpdateBottom()
         {
-            _drives.Children.Clear();
+            _bottom.Children.Clear();
+
+            var bat = SystemMonitor.Battery();
+            if (bat.HasBattery)
+            {
+                string glyph = bat.Charging ? "\U0001F50C" : "\U0001F50B";
+                string rem = bat.Charging ? "quvvatlanmoqda"
+                    : bat.Remaining is TimeSpan r ? $"~{UI.Duration(r)} qoldi" : "batareyada";
+                var icon = UI.Text(glyph, 13);
+                icon.FontFamily = new FontFamily("Segoe UI Emoji");
+                var pct = UI.Text($"{bat.Percent}%", 13, FontWeights.SemiBold,
+                    bat.Percent <= 20 && !bat.Charging ? UI.Res("Red") : UI.Res("Green"));
+                AddItem(UI.Row(icon.M(0, 0, 6, 0), pct, UI.Sub("  " + rem, 12)));
+            }
+
             foreach (var (name, used, total) in SystemMonitor.Drives())
             {
                 double p = total > 0 ? used / total : 0;
-                var head = UI.Columns("*", "auto");
-                head.Children.Add(UI.Text(name, 12.5, FontWeights.SemiBold));
-                head.Children.Add(UI.Sub($"{total - used:0} GB bo'sh", 11).At(1));
                 var (host, fill) = UI.ProgressBar(4, p > 0.9 ? UI.Res("Red") : UI.Res("Accent"));
+                host.Width = 50;
+                host.VerticalAlignment = VerticalAlignment.Center;
                 UI.SetProgress(host, fill, p);
-                _drives.Children.Add(UI.Col(head, host.M(0, 4, 0, 6)));
+                AddItem(UI.Row(UI.Text(name, 12.5, FontWeights.SemiBold), host.M(7, 0, 7, 0), UI.Sub($"{total - used:0} GB bo'sh", 12)));
             }
-            if (_drives.Children.Count == 0) _drives.Children.Add(UI.Sub("Disk topilmadi", 11.5));
+
+            var up = SystemMonitor.Uptime;
+            AddItem(UI.Sub(up.TotalDays >= 1 ? $"⏻ {(int)up.TotalDays} kun {up.Hours} soat" : $"⏻ {up.Hours} soat {up.Minutes} daq", 12));
+        }
+
+        void AddItem(FrameworkElement el)
+        {
+            el.VerticalAlignment = VerticalAlignment.Center;
+            if (_bottom.Children.Count > 0)
+                _bottom.Children.Add(new Border { Width = 1, Height = 14, Background = UI.Res("Line"), Margin = new Thickness(12, 0, 12, 0) });
+            _bottom.Children.Add(el);
         }
 
         static void DrawSpark(Canvas c, List<double> values, double max, Color color, bool clear = true, bool fill = true)
@@ -139,7 +175,7 @@ namespace Nusa.Pages
                 c.Children.Add(new Polygon
                 {
                     Points = area,
-                    Fill = new LinearGradientBrush(Color.FromArgb(0x55, color.R, color.G, color.B), Color.FromArgb(0x00, color.R, color.G, color.B), 90),
+                    Fill = new LinearGradientBrush(Color.FromArgb(0x66, color.R, color.G, color.B), Color.FromArgb(0x00, color.R, color.G, color.B), 90),
                 });
             }
             c.Children.Add(new Polyline { Points = pts, Stroke = UI.Br(color), StrokeThickness = 1.6, StrokeLineJoin = PenLineJoin.Round });

@@ -30,6 +30,7 @@ namespace Nusa.Pages
         {
             C.MinuteTick += Update;
             C.DataChanged += Update;
+            C.Weather.Changed += OnWeather;
             Update();
         }
 
@@ -37,7 +38,10 @@ namespace Nusa.Pages
         {
             C.MinuteTick -= Update;
             C.DataChanged -= Update;
+            C.Weather.Changed -= OnWeather;
         }
+
+        void OnWeather() => Dispatcher.BeginInvoke(Update);
 
         void Update()
         {
@@ -71,18 +75,24 @@ namespace Nusa.Pages
 
             _cards.Children.Clear();
 
-            // Batareya
-            var ps = System.Windows.Forms.SystemInformation.PowerStatus;
-            if (!ps.BatteryChargeStatus.HasFlag(System.Windows.Forms.BatteryChargeStatus.NoSystemBattery))
+            // Ob-havo
+            var w = C.Weather.Current;
+            if (w != null)
             {
-                int pct = (int)Math.Round(ps.BatteryLifePercent * 100);
-                bool ch = ps.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
-                _cards.Children.Add(Tile("BATAREYA", $"{pct}%", ch ? "Quvvatlanmoqda" : "Batareyadan", pct / 100.0,
-                    pct <= 20 && !ch ? UI.Res("Red") : UI.Res("Green")));
+                var emoji = UI.Text(w.Emoji, 20);
+                emoji.FontFamily = new FontFamily("Segoe UI Emoji");
+                var temp = UI.Text($"{w.Temp:0}°C", 18, FontWeights.SemiBold);
+                var col = UI.Col(UI.Sub(C.S.City.ToUpperInvariant(), 10.5),
+                    UI.Row(temp, emoji.M(6, -2, 0, 0)).M(0, 4, 0, 0),
+                    UI.Sub(w.Description, 11.5).M(0, 2, 0, 0),
+                    UI.Sub($"↑{w.Max:0}°  ↓{w.Min:0}°", 11.5).M(0, 2, 0, 0));
+                var card = UI.Card(col, 12, 14);
+                card.Margin = new Thickness(4, 0, 4, 0);
+                _cards.Children.Add(card);
             }
             else
             {
-                _cards.Children.Add(Tile("SOAT", DateTime.Now.ToString("HH:mm"), UI.ShortDate(DateTime.Now), null, UI.Res("Accent")));
+                _cards.Children.Add(Tile("OB-HAVO", "—", "yuklanmoqda…", null, UI.Res("Accent")));
             }
 
             // Namoz

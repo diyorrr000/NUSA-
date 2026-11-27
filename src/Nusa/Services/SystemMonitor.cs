@@ -12,7 +12,8 @@ namespace Nusa.Services
         double MemUsedGb,
         double MemTotalGb,
         double DownBytesPerSec,
-        double UpBytesPerSec);
+        double UpBytesPerSec,
+        double? Gpu);          // 0..1, mavjud bo'lmasa null
 
     /// <summary>
     /// CPU, xotira va internet tezligini o'lchaydi. Faqat "Tizim" sahifasi ochiq bo'lganda
@@ -25,6 +26,7 @@ namespace Nusa.Services
         public readonly List<double> MemHistory = new();
         public readonly List<double> DownHistory = new();
         public readonly List<double> UpHistory = new();
+        public readonly List<double> GpuHistory = new();
         public SystemSample Last { get; private set; }
 
         ulong _prevIdle, _prevKernel, _prevUser;
@@ -36,7 +38,9 @@ namespace Nusa.Services
             double cpu = ReadCpu();
             var (used, total) = ReadMemory();
             var (down, up) = ReadNetwork();
-            Last = new SystemSample(cpu, used, total, down, up);
+            double? gpu = ReadGpu();
+            Last = new SystemSample(cpu, used, total, down, up, gpu);
+            if (gpu.HasValue) Push(GpuHistory, gpu.Value);
             Push(CpuHistory, cpu);
             Push(MemHistory, total > 0 ? used / total : 0);
             Push(DownHistory, down);
@@ -119,6 +123,59 @@ namespace Nusa.Services
                 return (down, up);
             }
             catch { return (0, 0); }
+        }
+
+        // ---------- GPU (Windows "GPU Engine" hisoblagichlari, Task Manager bilan bir xil manba) ----------
+        readonly Dictionary<string, System.Diagnostics.PerformanceCounter> _gpuCounters = new();
+        DateTime _gpuRefresh = DateTime.MinValue;
+        bool _gpuUnavailable;
+
+        double? ReadGpu()
+        {
+            if (_gpuUnavailable) return null;
+            try
+            {
+                // Jarayonlar o'zgarib turadi — ro'yxatni har 5 soniyada yangilaymiz
+                if (DateTime.Now - _gpuRefresh > TimeSpan.FromSeconds(5))
+                {
+                    _gpuRefresh = DateTime.Now;
+                    var cat = new System.Diagnostics.PerformanceCounterCategory("GPU Engine");
+                    var names = cat.GetInstanceNames().Where(n => n.EndsWith("engtype_3D", StringComparison.OrdinalIgnoreCase)).ToHashSet();
+                    foreach (var gone in _gpuCounters.Keys.Where(k => !names.Contains(k)).ToList())
+                    {
+                        _gpuCounters[gone].Dispose();
+                        _gpuCounters.Remove(gone);
+                    }
+                    foreach (var n in names.Where(n => !_gpuCounters.ContainsKey(n)))
+                    {
+                        var pc = new System.Diagnostics.PerformanceCounter("GPU Engine", "Utilization Percentage", n, true);
+                        pc.NextValue(); // birinchi qiymat har doim 0
+                        _gpuCounters[n] = pc;
+                    }
+                }
+                double sum = 0;
+                foreach (var pc in _gpuCounters.Values)
+                {
+                    try { sum += pc.NextValue(); } catch { }
+                }
+                return Math.Clamp(sum / 100.0, 0, 1);
+            }
+            catch
+            {
+                _gpuUnavailable = true; // eski drayver yoki hisoblagich yo'q
+                return null;
+            }
+        }
+
+        // ---------- Batareya ----------
+        public static (bool HasBattery, int Percent, bool Charging, TimeSpan? Remaining) Battery()
+        {
+            var ps = System.Windows.Forms.SystemInformation.PowerStatus;
+            bool has = !ps.BatteryChargeStatus.HasFlag(System.Windows.Forms.BatteryChargeStatus.NoSystemBattery);
+            int pct = (int)Math.Round(ps.BatteryLifePercent * 100);
+            bool charging = ps.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
+            TimeSpan? rem = ps.BatteryLifeRemaining > 0 ? TimeSpan.FromSeconds(ps.BatteryLifeRemaining) : null;
+            return (has, pct, charging, rem);
         }
 
         // ---------- Disklar ----------

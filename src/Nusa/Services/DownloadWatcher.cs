@@ -10,9 +10,24 @@ namespace Nusa.Services
     /// "Yuklanmalar" papkasini kuzatadi va brauzer faylni yuklab bo'lganda xabar beradi.
     /// Windows o'zi o'zgarish haqida aytadi — papka qayta-qayta tekshirilmaydi.
     /// </summary>
+    public sealed class ActiveDownload
+    {
+        public string Path { get; init; } = "";
+        public string Name { get; init; } = "";
+        public long Bytes { get; set; }
+        public double BytesPerSec { get; set; }
+        internal long PrevBytes;
+        internal DateTime PrevTime;
+    }
+
     public sealed class DownloadWatcher : IDisposable
     {
         public event Action<string>? FileDownloaded;
+        public event Action? ProgressChanged;
+
+        /// <summary>Hozir yuklanayotgan fayllar (brauzerning vaqtinchalik fayllari bo'yicha).</summary>
+        public List<ActiveDownload> Active { get; } = new();
+        readonly DispatcherTimer _progressTimer;
 
         readonly Dispatcher _ui;
         FileSystemWatcher? _watcher;
@@ -31,6 +46,8 @@ namespace Nusa.Services
             _ui = ui;
             _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(800) };
             _timer.Tick += (_, _) => CheckPending();
+            _progressTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
+            _progressTimer.Tick += (_, _) => UpdateProgress();
         }
 
         public string? Folder { get; private set; }
@@ -49,6 +66,8 @@ namespace Nusa.Services
                 };
                 _watcher.Created += (_, e) => Queue(e.FullPath);
                 _watcher.Renamed += (_, e) => Queue(e.FullPath);
+                _watcher.Created += (_, e) => TrackTemp(e.FullPath);
+                _watcher.Renamed += (_, e) => TrackTemp(e.FullPath);
                 _watcher.Changed += (_, e) => Touch(e.FullPath);
                 _watcher.EnableRaisingEvents = true;
             }
@@ -61,7 +80,61 @@ namespace Nusa.Services
             _watcher.EnableRaisingEvents = false;
             _watcher.Dispose();
             _watcher = null;
-            _ui.BeginInvoke(() => { _pending.Clear(); _timer.Stop(); });
+            _ui.BeginInvoke(() =>
+            {
+                _pending.Clear(); _timer.Stop();
+                _progressTimer.Stop();
+                if (Active.Count > 0) { Active.Clear(); ProgressChanged?.Invoke(); }
+            });
+        }
+
+        // ---------- Yuklanish jarayoni ----------
+        void TrackTemp(string path)
+        {
+            if (!TempExtensions.Contains(Path.GetExtension(path))) return;
+            _ui.BeginInvoke(() =>
+            {
+                if (Active.Exists(a => string.Equals(a.Path, path, StringComparison.OrdinalIgnoreCase))) return;
+                var name = Path.GetFileNameWithoutExtension(path);
+                if (name.StartsWith("Unconfirmed ", StringComparison.OrdinalIgnoreCase)) name = "Fayl yuklanmoqda…";
+                Active.Add(new ActiveDownload { Path = path, Name = name, PrevTime = DateTime.Now });
+                if (!_progressTimer.IsEnabled) _progressTimer.Start();
+            });
+        }
+
+        void UpdateProgress()
+        {
+            var now = DateTime.Now;
+            bool changed = false;
+            foreach (var a in Active.ToArray())
+            {
+                long size;
+                try
+                {
+                    var fi = new FileInfo(a.Path);
+                    if (!fi.Exists) { Active.Remove(a); changed = true; continue; }
+                    size = fi.Length;
+                }
+                catch { continue; }
+                double sec = Math.Max(0.3, (now - a.PrevTime).TotalSeconds);
+                double speed = Math.Max(0, size - a.PrevBytes) / sec;
+                // Silliq ko'rinishi uchun o'rtacha tezlik
+                a.BytesPerSec = a.PrevBytes == 0 ? speed : a.BytesPerSec * 0.6 + speed * 0.4;
+                a.PrevBytes = size;
+                a.PrevTime = now;
+                a.Bytes = size;
+                changed = true;
+            }
+            if (Active.Count == 0) _progressTimer.Stop();
+            if (changed) ProgressChanged?.Invoke();
+        }
+
+        public static string FormatSize(long b)
+        {
+            if (b < 1024) return $"{b} B";
+            if (b < 1024 * 1024) return $"{b / 1024.0:0} KB";
+            if (b < 1024L * 1024 * 1024) return $"{b / 1048576.0:0.0} MB";
+            return $"{b / 1073741824.0:0.00} GB";
         }
 
         static bool IsTemp(string path)
@@ -94,6 +167,8 @@ namespace Nusa.Services
                 // Fayl 1.5 soniya o'zgarmay tursa — yuklab bo'lingan deb hisoblaymiz
                 if ((now - _pending[path]).TotalSeconds < 1.5) continue;
                 if (!File.Exists(path)) { _pending.Remove(path); continue; }
+                // Firefox avval bo'sh fayl yaratadi va "fayl.part" ga yuklaydi — yuklanish tugashini kutamiz
+                if (Active.Exists(a => a.Path.StartsWith(path, StringComparison.OrdinalIgnoreCase))) { _pending[path] = now; continue; }
                 if (IsLocked(path))
                 {
                     if ((now - _pending[path]).TotalMinutes > 30) _pending.Remove(path);

@@ -64,7 +64,7 @@ namespace Nusa
             Section("general", "Umumiy");
             Toggle("Windows bilan ishga tushish", "Har safar tizimga kirganingizda notch o'zi ochiladi.",
                 () => C.S.StartWithWindows, v => { C.S.StartWithWindows = v; AutoStart.Set(v); });
-            Toggle("Nusa maskoti", "Kompyuter jim turganda soat o'rniga ko'zchalar paydo bo'ladi, keyin uxlab qoladi.",
+            Toggle("Robotcha (maskot)", "Notchdagi mitti robot: sichqonchani kuzatadi, jim tursa u yoq-bu yoqqa qaraydi, keyin uxlaydi.",
                 () => C.S.Mascot, v => C.S.Mascot = v);
             Toggle("Minimal notch", "Yopiq notch ingichka qora chiziqqa aylanadi (qalin ramkali noutbuklar uchun).",
                 () => C.S.MinimalNotch, v => C.S.MinimalNotch = v);
@@ -116,7 +116,7 @@ namespace Nusa
             Toggle("Asr — Hanafiy mazhabi", "O'chirilsa Shofiiy/Molikiy/Hanbaliy hisobi ishlatiladi.",
                 () => C.S.AsrHanafi, v => C.S.AsrHanafi = v);
 
-            Body.Children.Add(Label("Shahar").M(0, 12, 0, 6));
+            Body.Children.Add(Label("Shahar (namoz vaqtlari va ob-havo uchun)").M(0, 12, 0, 6));
             var cityWrap = new WrapPanel();
             var latBox = new TextBox { Width = 110 };
             var lngBox = new TextBox { Width = 110 };

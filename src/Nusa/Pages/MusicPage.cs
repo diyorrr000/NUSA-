@@ -25,6 +25,8 @@ namespace Nusa.Pages
         readonly Border _knob;
         readonly Button _playBtn;
         readonly Button _lyricsBtn;
+        readonly Button _shuffleBtn;
+        readonly Button _repeatBtn;
         readonly Grid _player;
         readonly Grid _empty;
         readonly Grid _root;
@@ -91,12 +93,20 @@ namespace Nusa.Pages
             times.Children.Add(_left.At(1).Align(HorizontalAlignment.Right));
 
             // ---- Boshqaruv ----
-            _playBtn = UI.IconButton("", () => C.Media.PlayPause(), 44, 20, "Ijro / Pauza");
-            _lyricsBtn = UI.IconButton("", ToggleLyrics, 34, 14, "Sinxron matn");
+            // Oq dumaloq "play" tugmasi
+            _playBtn = UI.IconButton("\uE768", () => C.Media.PlayPause(), 42, 17, "Ijro / Pauza");
+            _playBtn.Background = Brushes.White;
+            _playBtn.Foreground = Brushes.Black;
+            _lyricsBtn = UI.IconButton("\uE8D2", ToggleLyrics, 30, 13, "Sinxron matn");
+            _shuffleBtn = UI.IconButton("\uE8B1", () => C.Media.ToggleShuffle(), 32, 13, "Aralashtirish");
+            _repeatBtn = UI.IconButton("\uE8EE", () => C.Media.CycleRepeat(), 32, 13, "Takrorlash");
             var controls = UI.Row(
-                UI.IconButton("", () => C.Media.Previous(), 38, 16, "Oldingi"),
+                _shuffleBtn.M(0, 0, 4, 0),
+                UI.IconButton("\uE892", () => C.Media.Previous(), 36, 15, "Oldingi"),
                 _playBtn.M(6, 0, 6, 0),
-                UI.IconButton("", () => C.Media.Next(), 38, 16, "Keyingi"));
+                UI.IconButton("\uE893", () => C.Media.Next(), 36, 15, "Keyingi"),
+                _repeatBtn.M(4, 0, 0, 0));
+            foreach (UIElement c in controls.Children) ((FrameworkElement)c).VerticalAlignment = VerticalAlignment.Center;
             controls.HorizontalAlignment = HorizontalAlignment.Center;
             var controlRow = new Grid();
             controlRow.Children.Add(controls);
@@ -187,6 +197,11 @@ namespace Nusa.Pages
             _source.Text = m.FriendlySource.Length > 0 ? "♪ " + m.FriendlySource : "";
             _playBtn.Content = m.IsPlaying ? "" : "";
             _lyricsBtn.Foreground = C.S.ShowLyrics ? UI.Br(m.ArtColor) : UI.Res("Sub");
+            _shuffleBtn.Foreground = m.Shuffle ? UI.Res("Accent") : UI.Res("Sub");
+            _shuffleBtn.Opacity = m.CanShuffle ? 1 : 0.35;
+            _repeatBtn.Content = m.Repeat == 1 ? "\uE8ED" : "\uE8EE";
+            _repeatBtn.Foreground = m.Repeat > 0 ? UI.Res("Accent") : UI.Res("Sub");
+            _repeatBtn.Opacity = m.CanRepeat ? 1 : 0.35;
 
             bool showLyrics = C.S.ShowLyrics;
             _lyricBox.Visibility = showLyrics ? Visibility.Visible : Visibility.Collapsed;
