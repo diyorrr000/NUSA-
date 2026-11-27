@@ -19,7 +19,14 @@ namespace Nusa.Services
         public bool ShowLyrics { get; set; } = true;
         public bool LyricsInNotch { get; set; } = true;
         public bool SystemOverlays { get; set; } = true; // ovoz, Caps Lock, til, batareya, internet
-        public bool DownloadAlerts { get; set; } = true;  // "Yuklanmalar" papkasiga yangi fayl tushganda
+        public bool DownloadAlerts { get; set; } = true;
+
+        // Liquid Glass (suyuq shisha)
+        public bool LiquidGlass { get; set; } = true;
+        /// <summary>"auto", "acrylic", "blur", "system" (Win11 DWM backdrop), "none"</summary>
+        public string GlassMode { get; set; } = "auto";
+        /// <summary>Haqiqiy yorug'lik sinishi (ekran bo'lagini oladi) — standart o'chiq.</summary>
+        public bool GlassRefraction { get; set; } = false;  // "Yuklanmalar" papkasiga yangi fayl tushganda
         public List<string> HiddenPages { get; set; } = new();
         public List<string> PageOrder { get; set; } = new();
 

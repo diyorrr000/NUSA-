@@ -26,6 +26,14 @@ Ekraningiz tepasida kichkina qora "orolcha" (iPhone'dagi Dynamic Island kabi). U
 
 Qo'shimcha: to'liq ekranli o'yin/video paytida yashirinadi, minimal (ingichka chiziq) rejim, sahifalarni yashirish va tartiblash, Windows bilan avtomatik ishga tushish. Tray (soat yonidagi) ikonkasini o'ng tugma bilan bosing — menyu chiqadi.
 
+## Liquid Glass (suyuq shisha)
+
+Notch foni iOS 26 dagi kabi tiniq shisha: Windows akril xiralashtirishi, yengil tus, yaltiroq qirra (yorug'lik yuqori-chapdan, sichqoncha yaqinlashsa unga buriladi), ichki nur, tepadagi nur dog'i, tashqi soya va "jele"dek prujinali harakat. Yorug'/qorong'i Windows mavzusiga avtomatik moslashadi, "animatsiyalarni kamaytirish" sozlamasini hurmat qiladi.
+
+- **Sozlamalar → Ko'rinish — Liquid Glass**: yoqish/o'chirish, shisha usuli (Avto / Akril / Blur / Windows 11 tizim shishasi / xiralashtirishsiz), tajribaviy **haqiqiy yorug'lik sinishi** (standart o'chiq).
+- Barcha raqamlar (tus, qirra, soya, prujina, sinish) bitta faylda: [`src/Nusa/Glass/GlassConfig.cs`](src/Nusa/Glass/GlassConfig.cs).
+- Akril ishlamasa avtomatik 55% shaffof bir xil rangli fonga o'tadi; sinish ishlamasa (masalan, DRM video) oddiy shishaga qaytadi.
+
 ## Yuklab olish va ishga tushirish
 
 1. GitHub'da **Actions → Build Nusa** bo'limiga kiring, oxirgi muvaffaqiyatli ishga tushirishni oching.
@@ -61,6 +69,9 @@ src/Nusa/
   NotchWindow.xaml(.cs)    notchning o'zi: holatlar, animatsiya, ogohlantirishlar, maskot
   SettingsWindow.xaml(.cs) sozlamalar oynasi
   Pages/                   notch sahifalari (Musiqa, Taymer, Vazifalar, Suv, Javon, Bufer, Namoz, Bugun, Tez sozlamalar, Tizim)
+  NotchWindow.Glass.cs     Liquid Glass: fon, region, qatlamlar, prujina, yorug'lik, sinish
+  Glass/                   GlassConfig (barcha qiymatlar), GlassBackdrop (DWM/akril/region),
+                           SpringEase, ThemeWatcher, ShadowWindow, RefractionRenderer
   Services/
     Core.cs                markaziy holat: pomodoro, suv, vazifalar, eslatmalar
     MediaService.cs        Windows media boshqaruvi (GlobalSystemMediaTransportControls)

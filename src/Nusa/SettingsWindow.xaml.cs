@@ -29,7 +29,17 @@ namespace Nusa
         {
             InitializeComponent();
             SourceInitialized += (_, _) => TryDarkTitleBar();
+            ApplyThemeBackground();
+            Nusa.Glass.ThemeWatcher.Changed += ApplyThemeBackground;
+            Closed += (_, _) => Nusa.Glass.ThemeWatcher.Changed -= ApplyThemeBackground;
             Build();
+        }
+
+        /// <summary>Yorug' mavzuda (shisha yoqilgan bo'lsa) matn qora bo'ladi — fon ham yorug' bo'lishi kerak.</summary>
+        void ApplyThemeBackground()
+        {
+            bool light = Nusa.Glass.ThemeWatcher.IsLight && C.S.LiquidGlass;
+            Background = light ? UI.Br("#F3F3F6") : UI.Br("#141416");
         }
 
         // Windows 10/11 sarlavha panelini qorong'i qilish
@@ -76,6 +86,37 @@ namespace Nusa
                 () => C.S.SystemOverlays, v => C.S.SystemOverlays = v);
             Toggle("Yuklab olingan fayllar", "\"Yuklanmalar\" papkasiga yangi fayl tushganda notchda ko'rsatadi. Bossangiz — javonga qo'shiladi.",
                 () => C.S.DownloadAlerts, v => C.S.DownloadAlerts = v);
+
+            // ---------- Liquid Glass ----------
+            Section("glass", "Ko'rinish — Liquid Glass");
+            Toggle("Suyuq shisha (Liquid Glass)", "Notch foni xiralashgan shaffof shisha bo'ladi: yaltiroq qirra, ichki nur, soya, prujinali harakat. O'chirilsa — klassik qora notch.",
+                () => C.S.LiquidGlass, v => { C.S.LiquidGlass = v; Dispatcher.BeginInvoke(ApplyThemeBackground); });
+            Body.Children.Add(Label("Shisha usuli").M(0, 8, 0, 4));
+            var modes = new (string Id, string Name)[]
+            {
+                ("auto", "Avto (tavsiya etiladi)"),
+                ("acrylic", "Akril — Windows 10/11 (SetWindowCompositionAttribute)"),
+                ("blur", "Oddiy blur — eng keng mos keluvchi"),
+                ("system", "Windows 11 tizim shishasi (DWM backdrop, 22H2+)"),
+                ("none", "Xiralashtirishsiz — yarim shaffof rang"),
+            };
+            foreach (var (id, name) in modes)
+            {
+                var rb = new RadioButton
+                {
+                    Content = name, GroupName = "glassmode", IsChecked = C.S.GlassMode == id,
+                    Foreground = UI.Res("Fg"), Margin = new Thickness(0, 3, 0, 3), FontSize = 13,
+                };
+                rb.Checked += (_, _) => { C.S.GlassMode = id; C.NotifySettingsChanged(); };
+                Body.Children.Add(rb);
+            }
+            var modeHint = UI.Sub("Agar shisha xiralashmasa (shunchaki shaffof yoki qora ko'rinsa) — boshqa usulni tanlab ko'ring.", 11.5);
+            modeHint.TextWrapping = TextWrapping.Wrap;
+            Body.Children.Add(modeHint.M(0, 4, 0, 6));
+            Toggle("Haqiqiy yorug'lik sinishi (tajribaviy)",
+                "Notch ostidagi ekran qismini olib, qirralarida linzadek sindiradi va kamalak beradi. Ko'proq resurs talab qiladi. " +
+                "Yoqilganda notch skrinshot va ekran yozuvlarida ko'rinmaydi. Ishlamasa o'zi o'chadi.",
+                () => C.S.GlassRefraction, v => C.S.GlassRefraction = v);
 
             // ---------- Sahifalar ----------
             Section("pages", "Sahifalar");
@@ -172,7 +213,7 @@ namespace Nusa
                     var cb = new RadioButton
                     {
                         Content = m.Name, GroupName = "method", IsChecked = C.S.PrayerMethod == m.Id,
-                        Foreground = Brushes.White, Margin = new Thickness(0, 3, 0, 3), FontSize = 13,
+                        Foreground = UI.Res("Fg"), Margin = new Thickness(0, 3, 0, 3), FontSize = 13,
                     };
                     cb.Checked += (_, _) => { C.S.PrayerMethod = m.Id; C.NotifySettingsChanged(); };
                     methods.Children.Add(cb);

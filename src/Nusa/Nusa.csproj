@@ -9,6 +9,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>Nusa</AssemblyName>
     <RootNamespace>Nusa</RootNamespace>

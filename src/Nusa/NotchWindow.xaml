@@ -19,8 +19,30 @@
                     Width="150" Height="32" ClipToBounds="True" AllowDrop="True"
                     MouseEnter="Island_MouseEnter" MouseLeave="Island_MouseLeave"
                     MouseLeftButtonUp="Island_Click"
-                    DragEnter="Island_DragEnter" DragLeave="Island_DragLeave" Drop="Island_Drop">
+                    DragEnter="Island_DragEnter" DragLeave="Island_DragLeave" Drop="Island_Drop"
+                    PreviewMouseLeftButtonDown="Island_PreviewDown" RenderTransformOrigin="0.5,0">
+                <Border.RenderTransform>
+                    <ScaleTransform x:Name="IslandScale"/>
+                </Border.RenderTransform>
                 <Grid>
+                    <!-- ===== LIQUID GLASS: orqa qatlamlar (Glass/GlassConfig.cs dagi qiymatlar bilan) ===== -->
+                    <Grid x:Name="GlassLayers" IsHitTestVisible="False" Visibility="Collapsed">
+                        <!-- 4-bosqich: sindirilgan fon tasviri -->
+                        <Image x:Name="RefractionImage" Stretch="Fill" Visibility="Collapsed">
+                            <Image.Effect>
+                                <BlurEffect x:Name="RefractionBlurFx" Radius="2"/>
+                            </Image.Effect>
+                        </Image>
+                        <!-- Tepadagi xira oq nur dog'i -->
+                        <Border x:Name="TopSpot" VerticalAlignment="Top"/>
+                        <!-- Qirradan ichkariga so'nadigan yumshoq nur -->
+                        <Border x:Name="InnerGlow" BorderThickness="6,0,6,6" Margin="0,-10,0,0">
+                            <Border.Effect>
+                                <BlurEffect x:Name="InnerGlowBlur" Radius="18"/>
+                            </Border.Effect>
+                        </Border>
+                    </Grid>
+
                     <!-- ===== YIG'ILGAN HOLAT ===== -->
                     <Grid x:Name="CollapsedView" Height="32" VerticalAlignment="Top">
                         <!-- Kompakt holat: robotcha · soat · qo'ng'iroqcha -->
@@ -141,6 +163,12 @@
                         </Grid>
                         <ContentControl x:Name="PageHost" Grid.Row="1" Margin="16,4,16,14" Focusable="False"/>
                     </Grid>
+
+                    <!-- ===== LIQUID GLASS: yuqori qatlamlar ===== -->
+                    <!-- Qirradagi yaltiroq chiziq (yorug'lik yo'nalishi sichqoncha bilan o'zgaradi) -->
+                    <Border x:Name="Rim" IsHitTestVisible="False" Visibility="Collapsed"/>
+                    <!-- Bosilganda tarqaladigan yorug'lik -->
+                    <Canvas x:Name="RippleLayer" IsHitTestVisible="False" ClipToBounds="True"/>
                 </Grid>
             </Border>
 

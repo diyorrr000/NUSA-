@@ -60,7 +60,12 @@ namespace Nusa
         // ---------- Animatsiyalanuvchi burchak radiusi ----------
         public static readonly DependencyProperty IslandRadiusProperty = DependencyProperty.Register(
             nameof(IslandRadius), typeof(double), typeof(NotchWindow),
-            new PropertyMetadata(16.0, (d, e) => ((NotchWindow)d).Island.CornerRadius = new CornerRadius(0, 0, (double)e.NewValue, (double)e.NewValue)));
+            new PropertyMetadata(16.0, (d, e) =>
+            {
+                var w = (NotchWindow)d;
+                w.Island.CornerRadius = new CornerRadius(0, 0, (double)e.NewValue, (double)e.NewValue);
+                w.OnGlassRadiusChanged();
+            }));
 
         public double IslandRadius
         {
@@ -125,6 +130,7 @@ namespace Nusa
             Native.HideFromAltTab(hwnd);
             Native.AddClipboardFormatListener(hwnd);
             HwndSource.FromHwnd(hwnd)?.AddHook(WndProc);
+            InitGlass();
         }
 
         IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -200,6 +206,7 @@ namespace Nusa
         // =====================================================================
         public void Refresh()
         {
+            UpdateTint();
             if (_expanded || _currentAlert != null) { UpdateMiniContent(); return; }
 
             Mode m;
@@ -279,16 +286,16 @@ namespace Nusa
 
         void SetEars(bool on)
         {
-            LeftEar.Visibility = RightEar.Visibility = on ? Visibility.Visible : Visibility.Hidden;
+            // Shisha rejimida "quloqlar" (qora burchak ulanishlari) kerak emas
+            LeftEar.Visibility = RightEar.Visibility = on && !_glassOn ? Visibility.Visible : Visibility.Hidden;
         }
 
         void AnimateIsland(double w, double h, double r, double seconds, bool bouncy = true)
         {
             if ((w, h) != _lastCollapsed) _sizeDirty = true;
-            IEasingFunction ease = bouncy
-                ? new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.22 }
-                : new CubicEase { EasingMode = EasingMode.EaseOut };
-            var d = new Duration(TimeSpan.FromSeconds(seconds));
+            // "Jele"dek prujina (Glass/SpringEase.cs); "animatsiyalarni kamaytirish" yoqilgan bo'lsa — qisqa va tekis
+            IEasingFunction ease = bouncy ? IslandEase() : new CubicEase { EasingMode = EasingMode.EaseOut };
+            var d = new Duration(TimeSpan.FromSeconds(bouncy ? IslandDuration(seconds) : seconds));
             Island.BeginAnimation(WidthProperty, new DoubleAnimation(w, d) { EasingFunction = ease });
             Island.BeginAnimation(HeightProperty, new DoubleAnimation(h, d) { EasingFunction = ease });
             BeginAnimation(IslandRadiusProperty, new DoubleAnimation(r, d) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
@@ -479,6 +486,7 @@ namespace Nusa
             if (_currentAlert != null) { _alertTimer.Stop(); AlertView.Visibility = Visibility.Collapsed; _currentAlert = null; }
 
             ShowPage(page);
+            UpdateTint();
             BigClock.Text = DateTime.Now.ToString("HH:mm");
             BigDate.Text = C.S.ShowDate ? UI.ShortDate(DateTime.Now) : "";
 
@@ -651,6 +659,7 @@ namespace Nusa
             _currentAlert = a;
             _barsTimer.Stop();
             _lyricTimer.Stop();
+            UpdateTint();
             FillAlert(a, animate: true);
             CollapsedView.BeginAnimation(OpacityProperty, null);
             CollapsedView.Opacity = 0;
