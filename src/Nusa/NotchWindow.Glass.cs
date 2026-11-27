@@ -43,7 +43,7 @@ namespace Nusa
             Island.SizeChanged += (_, _) => UpdateGlassGeometry();
             IsVisibleChanged += (_, _) =>
             {
-                if (_shadowWin != null) _shadowWin.Visibility = IsVisible && _glassOn ? Visibility.Visible : Visibility.Hidden;
+                if (_shadowWin != null) _shadowWin.Visibility = IsVisible && _glassOn && C.S.ShowShadow ? Visibility.Visible : Visibility.Hidden;
                 UpdateGlassTimers();
             };
             _rimTimer.Tick += (_, _) => FollowCursorLight();
@@ -91,7 +91,7 @@ namespace Nusa
 
                 _backdrop = GlassBackdrop.Apply(_hwnd, ParseMode(C.S.GlassMode), ThemeWatcher.IsLight);
                 GlassLayers.Visibility = Visibility.Visible;
-                Rim.Visibility = Visibility.Visible;
+                Rim.Visibility = C.S.ShowRim ? Visibility.Visible : Visibility.Collapsed;
                 SetEars(false);
                 EnsureShadow();
                 BuildGlassBrushes();
@@ -111,7 +111,7 @@ namespace Nusa
 
         void EnsureShadow()
         {
-            if (_shadowWin != null) { _shadowWin.Visibility = IsVisible ? Visibility.Visible : Visibility.Hidden; return; }
+            if (_shadowWin != null) { _shadowWin.Visibility = IsVisible && C.S.ShowShadow ? Visibility.Visible : Visibility.Hidden; return; }
             try
             {
                 _shadowWin = new ShadowWindow { Left = Left, Top = Top, Width = Width, Height = Height };
@@ -137,11 +137,8 @@ namespace Nusa
             };
             SetLight(_lightDir);
             Rim.BorderBrush = _rimBrush;
-            Rim.BorderThickness = new Thickness(GlassConfig.RimThickness, 0, GlassConfig.RimThickness, GlassConfig.RimThickness);
 
             InnerGlow.BorderBrush = new SolidColorBrush(white(GlassConfig.InnerGlowOpacity * (light ? 1.4 : 1)));
-            double g = GlassConfig.InnerGlowStroke;
-            InnerGlow.BorderThickness = new Thickness(g, 0, g, g);
             InnerGlowBlur.Radius = GlassConfig.InnerGlowDepth;
 
             TopSpot.Background = new RadialGradientBrush
@@ -181,6 +178,8 @@ namespace Nusa
                 double k = light ? Math.Clamp((0.45 - l) / 0.45, 0, 1) : Math.Clamp((l - 0.55) / 0.45, 0, 1);
                 alpha = Math.Max(alpha, alpha + (GlassConfig.MaxAutoTint - alpha) * k);
             }
+            // Foydalanuvchi sozlamasi: tus kuchi (0 = deyarli shaffof, 3 = ancha to'q)
+            alpha = Math.Clamp(alpha * Math.Clamp(C.S.GlassTintStrength, 0, 3), 0.01, 0.95);
             var c = light ? Color.FromArgb((byte)(255 * alpha), 255, 255, 255) : Color.FromArgb((byte)(255 * alpha), 0, 0, 0);
             Island.Background = new SolidColorBrush(c);
         }
@@ -194,13 +193,23 @@ namespace Nusa
                 var b = Island.TransformToAncestor(this).TransformBounds(new Rect(Island.RenderSize));
                 double dpi = VisualTreeHelper.GetDpi(this).DpiScaleX;
                 double r = IslandRadius * IslandScale.ScaleY;
+                // Masshtab (NotchScale) ham hisobga olingan radius
+                double sc = b.Height / Math.Max(1, Island.ActualHeight);
                 GlassBackdrop.SetRegion(_hwnd, (int)Math.Round(b.X * dpi), (int)Math.Round(b.Y * dpi),
-                    (int)Math.Round(b.Width * dpi), (int)Math.Round(b.Height * dpi), (int)Math.Round(r * dpi));
-                _shadowWin?.Follow(Left, Top, Width, Height, b, r);
+                    (int)Math.Round(b.Width * dpi), (int)Math.Round(b.Height * dpi), (int)Math.Round(r * sc * dpi), Floating);
+                if (_shadowWin != null)
+                {
+                    _shadowWin.Visibility = C.S.ShowShadow && IsVisible ? Visibility.Visible : Visibility.Hidden;
+                    _shadowWin.Follow(Left, Top, Width, Height, b, r * sc, Floating);
+                }
 
-                var cr = new CornerRadius(0, 0, IslandRadius, IslandRadius);
-                Rim.CornerRadius = cr;
-                InnerGlow.CornerRadius = new CornerRadius(0, 0, IslandRadius + 2, IslandRadius + 2);
+                Rim.CornerRadius = IslandCorners(IslandRadius);
+                Rim.Visibility = C.S.ShowRim ? Visibility.Visible : Visibility.Collapsed;
+                double rt = GlassConfig.RimThickness, g = GlassConfig.InnerGlowStroke;
+                Rim.BorderThickness = new Thickness(rt, Floating ? rt : 0, rt, rt);
+                InnerGlow.BorderThickness = new Thickness(g, Floating ? g : 0, g, g);
+                InnerGlow.Margin = new Thickness(0, Floating ? 0 : -10, 0, 0);
+                InnerGlow.CornerRadius = IslandCorners(IslandRadius + 2);
                 TopSpot.Height = Math.Max(10, Island.ActualHeight * GlassConfig.TopSpotHeightRatio);
             }
             catch { }

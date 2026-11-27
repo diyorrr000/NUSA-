@@ -15,7 +15,7 @@ namespace Nusa
         NotchWindow? _notch;
         Forms.NotifyIcon? _tray;
         SettingsWindow? _settings;
-        Forms.ToolStripMenuItem? _miStartup, _miMascot, _miMinimal;
+        Forms.ToolStripMenuItem? _miStartup, _miMascot, _miMinimal, _miGlass, _miSize;
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -62,12 +62,33 @@ namespace Nusa
             var menu = new Forms.ContextMenuStrip { Renderer = new DarkRenderer(), ShowImageMargin = false, ShowCheckMargin = true };
             menu.Font = new Font("Segoe UI", 9.5f);
 
-            menu.Items.Add("Sozlamalar…", null, (_, _) => OpenSettings());
+            var title = new Forms.ToolStripLabel("Nusa") { Font = new Font("Segoe UI Semibold", 10f), Image = LogoBitmap(20), ImageAlign = ContentAlignment.MiddleLeft };
+            menu.Items.Add(title);
             menu.Items.Add(new Forms.ToolStripSeparator());
+            menu.Items.Add("Notchni ochish", null, (_, _) => _notch?.Expand(null));
+            menu.Items.Add("Sozlamalar…", null, (_, _) => OpenSettings());
+            menu.Items.Add("Notch ko'rinishi…", null, (_, _) => OpenSettings("notch"));
+            menu.Items.Add(new Forms.ToolStripSeparator());
+
+            // Notch o'lchami — tez tanlash
+            _miSize = new Forms.ToolStripMenuItem("Notch o'lchami");
+            foreach (var pct in new[] { 80, 90, 100, 115, 130, 150 })
+            {
+                var it = new Forms.ToolStripMenuItem(pct + "%") { Tag = pct / 100.0, ForeColor = Color.White };
+                it.Click += (_, _) => { _core!.S.NotchScale = (double)it.Tag!; _core.NotifySettingsChanged(); };
+                _miSize.DropDownItems.Add(it);
+            }
+            _miSize.DropDown.BackColor = Color.FromArgb(32, 32, 35);
+            ((Forms.ToolStripDropDownMenu)_miSize.DropDown).ShowImageMargin = false;
+            ((Forms.ToolStripDropDownMenu)_miSize.DropDown).ShowCheckMargin = true;
+            menu.Items.Add(_miSize);
+            _miGlass = new Forms.ToolStripMenuItem("Liquid Glass (shisha)") { CheckOnClick = true };
+            _miGlass.Click += (_, _) => { _core!.S.LiquidGlass = _miGlass.Checked; _core.NotifySettingsChanged(); };
+            menu.Items.Add(_miGlass);
 
             _miStartup = new Forms.ToolStripMenuItem("Windows bilan ishga tushish") { CheckOnClick = true };
             _miStartup.Click += (_, _) => { _core!.S.StartWithWindows = _miStartup.Checked; AutoStart.Set(_miStartup.Checked); _core.NotifySettingsChanged(); };
-            _miMascot = new Forms.ToolStripMenuItem("Robotcha (maskot)") { CheckOnClick = true };
+            _miMascot = new Forms.ToolStripMenuItem("Jonzotcha (maskot)") { CheckOnClick = true };
             _miMascot.Click += (_, _) => { _core!.S.Mascot = _miMascot.Checked; _core.NotifySettingsChanged(); };
             _miMinimal = new Forms.ToolStripMenuItem("Minimal notch (ingichka chiziq)") { CheckOnClick = true };
             _miMinimal.Click += (_, _) => { _core!.S.MinimalNotch = _miMinimal.Checked; _core.NotifySettingsChanged(); };
@@ -88,6 +109,7 @@ namespace Nusa
                 Visible = true,
             };
             _tray.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) _notch?.Expand(null); };
+            _tray.MouseDoubleClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) OpenSettings(); };
             SyncTrayChecks();
         }
 
@@ -96,7 +118,8 @@ namespace Nusa
             try
             {
                 var res = GetResourceStream(new Uri("pack://application:,,,/Assets/nusa.ico"));
-                if (res != null) return new Icon(res.Stream, new System.Drawing.Size(16, 16));
+                // Ekran masshtabiga mos o'lcham (100% — 16 px, 150% — 24 px ...)
+                if (res != null) return new Icon(res.Stream, Forms.SystemInformation.SmallIconSize);
             }
             catch { }
             // Zaxira: kodda chizilgan kichik notch
@@ -116,8 +139,29 @@ namespace Nusa
             return Icon.FromHandle(bmp.GetHicon());
         }
 
+        /// <summary>Menyu sarlavhasi uchun logo (Assets/logo.png).</summary>
+        static Bitmap? LogoBitmap(int size)
+        {
+            try
+            {
+                var res = GetResourceStream(new Uri("pack://application:,,,/Assets/logo.png"));
+                if (res == null) return null;
+                using var src = new Bitmap(res.Stream);
+                var bmp = new Bitmap(size, size);
+                using var g = Graphics.FromImage(bmp);
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.DrawImage(src, 0, 0, size, size);
+                return bmp;
+            }
+            catch { return null; }
+        }
+
         void SyncTrayChecks()
         {
+            if (_miGlass != null && _core != null) _miGlass.Checked = _core.S.LiquidGlass;
+            if (_miSize != null && _core != null)
+                foreach (Forms.ToolStripMenuItem it in _miSize.DropDownItems)
+                    it.Checked = Math.Abs((double)it.Tag! - _core.S.NotchScale) < 0.01;
             if (_core == null || _miStartup == null) return;
             _miStartup.Checked = _core.S.StartWithWindows;
             _miMascot!.Checked = _core.S.Mascot;

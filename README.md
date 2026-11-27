@@ -26,6 +26,13 @@ Ekraningiz tepasida kichkina qora "orolcha" (iPhone'dagi Dynamic Island kabi). U
 
 Qo'shimcha: to'liq ekranli o'yin/video paytida yashirinadi, minimal (ingichka chiziq) rejim, sahifalarni yashirish va tartiblash, Windows bilan avtomatik ishga tushish. Tray (soat yonidagi) ikonkasini o'ng tugma bilan bosing — menyu chiqadi.
 
+## Tray va sozlamalar
+
+Nusa ikonkasi (qora mushukcha) soat yonidagi tray'da — ko'pincha `^` (yashirin ikonkalar) ichida — turadi. Uni sudrab vazifalar paneliga chiqarib qo'yish mumkin.
+
+- **Chap tugma** — notchni ochadi, **ikki marta bosish** — sozlamalar, **o'ng tugma** — menyu: notchni ochish, sozlamalar, notch o'lchami (80–150%), Liquid Glass, Windows bilan ishga tushish, maskot, minimal notch, chiqish.
+- **Sozlamalar → Notch**: o'lchami (70–160%), shaffofligi, shisha tusi, burchaklar, ochilgan kenglik, gorizontal joylashuv, tepadan masofa (suzuvchi notch), ochilish/yopilish kechikishi, soya, qirra — hammasi surilganda darhol ko'rinadi; bitta tugma bilan standart holatga qaytadi.
+
 ## Liquid Glass (suyuq shisha)
 
 Notch foni iOS 26 dagi kabi tiniq shisha: Windows akril xiralashtirishi, yengil tus, yaltiroq qirra (yorug'lik yuqori-chapdan, sichqoncha yaqinlashsa unga buriladi), ichki nur, tepadagi nur dog'i, tashqi soya va "jele"dek prujinali harakat. Yorug'/qorong'i Windows mavzusiga avtomatik moslashadi, "animatsiyalarni kamaytirish" sozlamasini hurmat qiladi.

@@ -53,14 +53,14 @@ namespace Nusa.Glass
         public IntPtr Handle => new WindowInteropHelper(this).Handle;
 
         /// <summary>Soyani notch o'lchami va joyiga moslaydi (DIP birliklarda, oynaga nisbatan).</summary>
-        public void Follow(double left, double top, double windowWidth, double windowHeight, Rect island, double radius)
+        public void Follow(double left, double top, double windowWidth, double windowHeight, Rect island, double radius, bool floating = false)
         {
             Left = left; Top = top; Width = windowWidth; Height = windowHeight;
             _shadow.Width = Math.Max(0, island.Width - 6);
             _shadow.Height = Math.Max(0, island.Height - 4);
             _shadow.Margin = new Thickness(island.X + 3, island.Y, 0, 0);
             _shadow.HorizontalAlignment = HorizontalAlignment.Left;
-            _shadow.CornerRadius = new CornerRadius(0, 0, radius, radius);
+            _shadow.CornerRadius = floating ? new CornerRadius(radius) : new CornerRadius(0, 0, radius, radius);
         }
     }
 }

@@ -26,7 +26,31 @@ namespace Nusa.Services
         /// <summary>"auto", "acrylic", "blur", "system" (Win11 DWM backdrop), "none"</summary>
         public string GlassMode { get; set; } = "auto";
         /// <summary>Haqiqiy yorug'lik sinishi (ekran bo'lagini oladi) — standart o'chiq.</summary>
-        public bool GlassRefraction { get; set; } = false;  // "Yuklanmalar" papkasiga yangi fayl tushganda
+        public bool GlassRefraction { get; set; } = false;
+
+        // Notch ko'rinishi va joylashuvi (Sozlamalar → Notch)
+        public double NotchScale { get; set; } = 1.0;        // 0.7 – 1.6
+        public double NotchOpacity { get; set; } = 1.0;      // 0.3 – 1.0
+        public double GlassTintStrength { get; set; } = 1.0; // 0 – 3 (shisha tusi kuchi)
+        public double CornerScale { get; set; } = 1.0;       // 0.3 – 1.6 (burchak yumaloqligi)
+        public double HorizontalOffset { get; set; } = 0;    // px, markazdan chap(−)/o'ng(+)
+        public double TopOffset { get; set; } = 0;           // px; 0 dan katta bo'lsa — "suzuvchi" notch
+        public double ExpandedWidth { get; set; } = 680;     // ochilgan notch kengligi
+        public int HoverDelayMs { get; set; } = 110;         // ochilish kechikishi
+        public int CloseDelayMs { get; set; } = 380;         // yopilish kechikishi
+        public bool ShowShadow { get; set; } = true;
+        public bool ShowRim { get; set; } = true;
+
+        /// <summary>Ko'rinish sozlamalarini standart holatga qaytaradi.</summary>
+        public void ResetAppearance()
+        {
+            var d = new Settings();
+            NotchScale = d.NotchScale; NotchOpacity = d.NotchOpacity; GlassTintStrength = d.GlassTintStrength;
+            CornerScale = d.CornerScale; HorizontalOffset = d.HorizontalOffset; TopOffset = d.TopOffset;
+            ExpandedWidth = d.ExpandedWidth; HoverDelayMs = d.HoverDelayMs; CloseDelayMs = d.CloseDelayMs;
+            ShowShadow = d.ShowShadow; ShowRim = d.ShowRim; LiquidGlass = d.LiquidGlass; GlassMode = d.GlassMode;
+            GlassRefraction = d.GlassRefraction; MinimalNotch = d.MinimalNotch;
+        }  // "Yuklanmalar" papkasiga yangi fayl tushganda
         public List<string> HiddenPages { get; set; } = new();
         public List<string> PageOrder { get; set; } = new();
 

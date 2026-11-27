@@ -63,7 +63,7 @@ namespace Nusa
             new PropertyMetadata(16.0, (d, e) =>
             {
                 var w = (NotchWindow)d;
-                w.Island.CornerRadius = new CornerRadius(0, 0, (double)e.NewValue, (double)e.NewValue);
+                w.Island.CornerRadius = w.IslandCorners((double)e.NewValue);
                 w.OnGlassRadiusChanged();
             }));
 
@@ -91,7 +91,7 @@ namespace Nusa
             };
 
             SourceInitialized += OnSourceInitialized;
-            Loaded += (_, _) => { PositionWindow(); Refresh(); };
+            Loaded += (_, _) => { ApplyAppearance(); Refresh(); };
             Deactivated += (_, _) => { if (_expanded && !Island.IsMouseOver) _leaveTimer.Start(); };
 
             C.Tick += OnTick;
@@ -156,7 +156,8 @@ namespace Nusa
         void PositionWindow()
         {
             var wa = SystemParameters.PrimaryScreenWidth;
-            Left = Math.Round((wa - Width) / 2);
+            double left = (wa - Width) / 2 + C.S.HorizontalOffset;
+            Left = Math.Round(Math.Clamp(left, -Width / 2 + 120, wa - Width / 2 - 120));
             Top = 0;
         }
 
@@ -196,6 +197,7 @@ namespace Nusa
 
         void OnSettingsChanged()
         {
+            ApplyAppearance();
             if (C.S.SystemOverlays) _sysTimer.Start(); else _sysTimer.Stop();
             BuildTabs();
             Refresh();
@@ -287,7 +289,7 @@ namespace Nusa
         void SetEars(bool on)
         {
             // Shisha rejimida "quloqlar" (qora burchak ulanishlari) kerak emas
-            LeftEar.Visibility = RightEar.Visibility = on && !_glassOn ? Visibility.Visible : Visibility.Hidden;
+            LeftEar.Visibility = RightEar.Visibility = on && !_glassOn && !Floating ? Visibility.Visible : Visibility.Hidden;
         }
 
         void AnimateIsland(double w, double h, double r, double seconds, bool bouncy = true)
@@ -296,6 +298,8 @@ namespace Nusa
             // "Jele"dek prujina (Glass/SpringEase.cs); "animatsiyalarni kamaytirish" yoqilgan bo'lsa — qisqa va tekis
             IEasingFunction ease = bouncy ? IslandEase() : new CubicEase { EasingMode = EasingMode.EaseOut };
             var d = new Duration(TimeSpan.FromSeconds(bouncy ? IslandDuration(seconds) : seconds));
+            // Burchak yumaloqligi sozlamasi (balandlikning yarmidan oshmaydi)
+            r = Math.Min(r * Math.Clamp(C.S.CornerScale, 0.3, 1.6), h / 2);
             Island.BeginAnimation(WidthProperty, new DoubleAnimation(w, d) { EasingFunction = ease });
             Island.BeginAnimation(HeightProperty, new DoubleAnimation(h, d) { EasingFunction = ease });
             BeginAnimation(IslandRadiusProperty, new DoubleAnimation(r, d) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
@@ -501,7 +505,34 @@ namespace Nusa
             AnimateIsland(ExpandedWidth, 44 + (_currentPage?.PreferredHeight ?? 196) + 18, 30, 0.5);
         }
 
-        const double ExpandedWidth = 680;
+        double ExpandedWidth => Math.Clamp(C.S.ExpandedWidth, 560, 900);
+
+        /// <summary>Notch ekran tepasidan ajralib "suzib" turadimi (TopOffset > 0).</summary>
+        bool Floating => C.S.TopOffset > 0.5;
+
+        CornerRadius IslandCorners(double r) => Floating ? new CornerRadius(r) : new CornerRadius(0, 0, r, r);
+
+        /// <summary>
+        /// Sozlamalardagi ko'rinish qiymatlarini qo'llaydi: o'lcham (masshtab), shaffoflik, joylashuv,
+        /// ochilgan kenglik, ochilish/yopilish kechikishi.
+        /// </summary>
+        void ApplyAppearance()
+        {
+            var s = C.S;
+            double sc = Math.Clamp(s.NotchScale, 0.7, 1.6);
+            NotchRow.LayoutTransform = Math.Abs(sc - 1) < 0.001 ? Transform.Identity : new ScaleTransform(sc, sc);
+            NotchRow.Margin = new Thickness(0, Math.Clamp(s.TopOffset, 0, 80), 0, 0);
+            ExpandedView.Width = ExpandedWidth - 20;
+            Width = Math.Ceiling(Math.Max(760, ExpandedWidth + 80) * sc);
+            Height = Math.Ceiling(420 * sc + Math.Clamp(s.TopOffset, 0, 80));
+            Island.Opacity = Math.Clamp(s.NotchOpacity, 0.3, 1.0);
+            _hoverTimer.Interval = TimeSpan.FromMilliseconds(Math.Clamp(s.HoverDelayMs, 0, 2000));
+            _leaveTimer.Interval = TimeSpan.FromMilliseconds(Math.Clamp(s.CloseDelayMs, 80, 3000));
+            Island.CornerRadius = IslandCorners(IslandRadius);
+            PositionWindow();
+            _sizeDirty = true;
+            if (_expanded) RelayoutExpanded();
+        }
 
         public void Collapse()
         {

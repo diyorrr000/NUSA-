@@ -131,12 +131,13 @@ namespace Nusa.Glass
         /// Oynani notch shaklida qirqadi (fizik piksellarda). Yuqori burchaklar ekran chetidan tashqarida
         /// qolishi uchun to'rtburchak yuqoriga cho'zilgan — natijada faqat pastki burchaklar yumaloq.
         /// </summary>
-        public static void SetRegion(IntPtr hwnd, int x, int y, int w, int h, int radius)
+        public static void SetRegion(IntPtr hwnd, int x, int y, int w, int h, int radius, bool allCorners = false)
         {
             try
             {
                 int d = Math.Max(2, radius * 2);
-                var rgn = CreateRoundRectRgn(x, y - d, x + w + 1, y + h + 1, d, d);
+                // "Suzuvchi" notchda to'rtala burchak yumaloq; aks holda yuqorisi ekran chetiga yopishgan
+                var rgn = CreateRoundRectRgn(x, allCorners ? y : y - d, x + w + 1, y + h + 1, d, d);
                 if (rgn == IntPtr.Zero) return;
                 if (SetWindowRgn(hwnd, rgn, true) == 0) DeleteObject(rgn); // muvaffaqiyatli bo'lsa region tizimga o'tadi
             }

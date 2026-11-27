@@ -15,6 +15,15 @@ namespace Nusa
     {
         Core C => Core.I;
         readonly Dictionary<string, FrameworkElement> _sections = new();
+        readonly Dictionary<string, Button> _navButtons = new();
+        readonly System.Windows.Threading.DispatcherTimer _liveApply = new() { Interval = TimeSpan.FromMilliseconds(70) };
+
+        // Chap menyudagi bo'lim ikonkalari
+        static readonly Dictionary<string, string> SectionGlyphs = new()
+        {
+            ["general"] = "\uE713", ["notch"] = "\uE7F4", ["glass"] = "\uE790", ["pages"] = "\uE8A9",
+            ["music"] = "\uE8D6", ["timer"] = "\uE916", ["water"] = "\uE945", ["prayer"] = "\uE706", ["about"] = "\uE946",
+        };
 
         static readonly (string Name, double Lat, double Lng)[] Cities =
         {
@@ -32,6 +41,9 @@ namespace Nusa
             ApplyThemeBackground();
             Nusa.Glass.ThemeWatcher.Changed += ApplyThemeBackground;
             Closed += (_, _) => Nusa.Glass.ThemeWatcher.Changed -= ApplyThemeBackground;
+            _liveApply.Tick += (_, _) => { _liveApply.Stop(); C.NotifySettingsChanged(); };
+            var ver = typeof(App).Assembly.GetName().Version;
+            VersionText.Text = $"versiya {ver?.Major}.{ver?.Minor}.{ver?.Build}";
             Build();
         }
 
@@ -40,6 +52,7 @@ namespace Nusa
         {
             bool light = Nusa.Glass.ThemeWatcher.IsLight && C.S.LiquidGlass;
             Background = light ? UI.Br("#F3F3F6") : UI.Br("#141416");
+            NavBg.Background = light ? UI.Br("#E6E7EC") : UI.Br("#0D0D0F");
         }
 
         // Windows 10/11 sarlavha panelini qorong'i qilish
@@ -60,8 +73,38 @@ namespace Nusa
         public void ScrollTo(string section)
         {
             if (_sections.TryGetValue(section, out var el))
-                Dispatcher.BeginInvoke(() => el.BringIntoView(new Rect(0, 0, 10, Scroll.ViewportHeight)), System.Windows.Threading.DispatcherPriority.Loaded);
+                Dispatcher.BeginInvoke(() =>
+                {
+                    // Bo'lim sarlavhasini ro'yxatning eng tepasiga olib chiqamiz
+                    var p = el.TransformToAncestor(Body).Transform(new Point(0, 0));
+                    Scroll.ScrollToVerticalOffset(Math.Max(0, p.Y - 8));
+                    HighlightNav(section);
+                }, System.Windows.Threading.DispatcherPriority.Loaded);
         }
+
+        void HighlightNav(string id)
+        {
+            foreach (var (key, b) in _navButtons)
+            {
+                b.Background = key == id ? UI.Res("CardHover") : Brushes.Transparent;
+                b.Foreground = key == id ? UI.Res("Fg") : UI.Res("Sub");
+            }
+        }
+
+        /// <summary>Barcha bo'limlarni qaytadan quradi (masalan, standart holatga qaytarilgandan keyin).</summary>
+        void Rebuild()
+        {
+            double offset = Scroll.VerticalOffset;
+            Body.Children.Clear();
+            Nav.Children.Clear();
+            _sections.Clear();
+            _navButtons.Clear();
+            Build();
+            Dispatcher.BeginInvoke(() => Scroll.ScrollToVerticalOffset(offset), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        /// <summary>Slayder surilayotganda notch darhol o'zgaradi (70 ms dan tez emas).</summary>
+        void LiveApply() { _liveApply.Stop(); _liveApply.Start(); }
 
         // =================================================================
         void Build()
@@ -76,8 +119,6 @@ namespace Nusa
                 () => C.S.StartWithWindows, v => { C.S.StartWithWindows = v; AutoStart.Set(v); });
             Toggle("Robotcha (maskot)", "Notchdagi mitti robot: sichqonchani kuzatadi, jim tursa u yoq-bu yoqqa qaraydi, keyin uxlaydi.",
                 () => C.S.Mascot, v => C.S.Mascot = v);
-            Toggle("Minimal notch", "Yopiq notch ingichka qora chiziqqa aylanadi (qalin ramkali noutbuklar uchun).",
-                () => C.S.MinimalNotch, v => C.S.MinimalNotch = v);
             Toggle("Soatni ko'rsatish", null, () => C.S.ShowClock, v => C.S.ShowClock = v);
             Toggle("Sanani ko'rsatish", "Ochilgan notchning yuqori o'ng burchagida.", () => C.S.ShowDate, v => C.S.ShowDate = v);
             Toggle("To'liq ekranda yashirinish", "O'yin, video yoki taqdimot paytida notch xalaqit bermaydi.",
@@ -86,6 +127,39 @@ namespace Nusa
                 () => C.S.SystemOverlays, v => C.S.SystemOverlays = v);
             Toggle("Yuklab olingan fayllar", "\"Yuklanmalar\" papkasiga yangi fayl tushganda notchda ko'rsatadi. Bossangiz — javonga qo'shiladi.",
                 () => C.S.DownloadAlerts, v => C.S.DownloadAlerts = v);
+
+            // ---------- Notch ko'rinishi ----------
+            Section("notch", "Notch");
+            Body.Children.Add(UI.Sub("O'zgarishlar darhol ko'rinadi — notchni kuzatib turing.", 12).M(0, 0, 0, 6));
+            SliderSetting("O'lchami", () => C.S.NotchScale, v => C.S.NotchScale = v, 0.7, 1.6, v => $"{v * 100:0}%",
+                "Butun notch — matn, ikonkalar, maskot — kattalashadi yoki kichrayadi.");
+            SliderSetting("Shaffofligi", () => C.S.NotchOpacity, v => C.S.NotchOpacity = v, 0.3, 1.0, v => $"{v * 100:0}%",
+                "100% — to'liq ko'rinadi; kamaytirsangiz notch ortidagi narsalar ko'rinib turadi.");
+            SliderSetting("Shisha tusi", () => C.S.GlassTintStrength, v => C.S.GlassTintStrength = v, 0, 3, v => v < 0.05 ? "yo'q" : $"{v * 100:0}%",
+                "Shisha qanchalik to'q (yorug' mavzuda — oq) bo'lishi. Liquid Glass yoqilganda ishlaydi.");
+            SliderSetting("Burchaklar", () => C.S.CornerScale, v => C.S.CornerScale = v, 0.3, 1.6, v => $"{v * 100:0}%",
+                "Burchaklar yumaloqligi.");
+            SliderSetting("Ochilgan kenglik", () => C.S.ExpandedWidth, v => C.S.ExpandedWidth = Math.Round(v), 560, 900, v => $"{v:0} px");
+            SliderSetting("Gorizontal joylashuv", () => C.S.HorizontalOffset, v => C.S.HorizontalOffset = Math.Abs(v) < 12 ? 0 : Math.Round(v), -600, 600,
+                v => Math.Abs(v) < 12 ? "markazda" : v < 0 ? $"chapga {-v:0} px" : $"o'ngga {v:0} px");
+            SliderSetting("Tepadan masofa", () => C.S.TopOffset, v => C.S.TopOffset = Math.Round(v), 0, 60,
+                v => v < 0.5 ? "ekranga yopishgan" : $"{v:0} px — suzuvchi",
+                "0 dan katta bo'lsa notch ekran chetidan ajralib, to'rtala burchagi yumaloq \"orolcha\" bo'ladi.");
+            SliderSetting("Ochilish kechikishi", () => C.S.HoverDelayMs, v => C.S.HoverDelayMs = (int)Math.Round(v / 10) * 10, 0, 1000, v => $"{v:0} ms",
+                "Sichqoncha ustiga kelgach, notch qancha kutib ochilsin.");
+            SliderSetting("Yopilish kechikishi", () => C.S.CloseDelayMs, v => C.S.CloseDelayMs = (int)Math.Round(v / 10) * 10, 100, 2000, v => $"{v:0} ms");
+            Toggle("Soya", "Notch ostidagi yumshoq soya (Liquid Glass rejimida).", () => C.S.ShowShadow, v => C.S.ShowShadow = v);
+            Toggle("Yaltiroq qirra", "Shisha qirrasidagi yorug' chiziq.", () => C.S.ShowRim, v => C.S.ShowRim = v);
+            Toggle("Minimal notch", "Yopiq notch ingichka chiziqqa aylanadi.", () => C.S.MinimalNotch, v => C.S.MinimalNotch = v);
+            var reset = UI.Pill("Ko'rinishni standart holatga qaytarish", () =>
+            {
+                C.S.ResetAppearance();
+                C.NotifySettingsChanged();
+                ApplyThemeBackground();
+                Rebuild();
+            });
+            reset.HorizontalAlignment = HorizontalAlignment.Left;
+            Body.Children.Add(reset.M(0, 10, 0, 0));
 
             // ---------- Liquid Glass ----------
             Section("glass", "Ko'rinish — Liquid Glass");
@@ -242,9 +316,58 @@ namespace Nusa
 
         void Section(string id, string title)
         {
-            var t = UI.Text(title, 16, FontWeights.SemiBold).M(0, 22, 0, 6);
+            var t = UI.Text(title, 17, FontWeights.SemiBold).M(0, 26, 0, 8);
             _sections[id] = t;
             Body.Children.Add(t);
+
+            // Chap menyuga tugma
+            var icon = new TextBlock { FontSize = 14, Width = 22 };
+            UI.ApplyGlyph(icon, SectionGlyphs.TryGetValue(id, out var g) ? g : "\uE713");
+            icon.FontSize = 14;
+            icon.SetBinding(TextBlock.ForegroundProperty, new System.Windows.Data.Binding("Foreground") { RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.FindAncestor, typeof(Button), 1) });
+            var text = new TextBlock { Text = title.Split('—')[0].Trim(), FontSize = 13.5, Margin = new Thickness(8, 0, 0, 0) };
+            text.SetBinding(TextBlock.ForegroundProperty, new System.Windows.Data.Binding("Foreground") { RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.FindAncestor, typeof(Button), 1) });
+            var btn = UI.Pill(UI.Row(icon, text), () => ScrollTo(id), Brushes.Transparent, UI.Res("Sub"));
+            btn.HorizontalContentAlignment = HorizontalAlignment.Left;
+            btn.HorizontalAlignment = HorizontalAlignment.Stretch;
+            btn.FontWeight = FontWeights.Normal;
+            btn.Padding = new Thickness(12, 8, 12, 8);
+            btn.Margin = new Thickness(0, 0, 0, 2);
+            _navButtons[id] = btn;
+            Nav.Children.Add(btn);
+        }
+
+        /// <summary>Nomi · slayder · qiymati (+ ixtiyoriy izoh) qatori.</summary>
+        void SliderSetting(string label, Func<double> get, Action<double> set, double min, double max, Func<double, string> format, string? hint = null)
+        {
+            var slider = new Nusa.Controls.SliderBar(UI.Res("Accent")) { Value = (Math.Clamp(get(), min, max) - min) / (max - min) };
+            var value = UI.Sub(format(get()), 12.5);
+            value.HorizontalAlignment = HorizontalAlignment.Right;
+            value.VerticalAlignment = VerticalAlignment.Center;
+            slider.ValueChanging += f =>
+            {
+                double v = min + f * (max - min);
+                set(v);
+                value.Text = format(get());
+                LiveApply();
+            };
+            slider.ValueCommitted += _ => { _liveApply.Stop(); C.NotifySettingsChanged(); };
+
+            var l = UI.Text(label, 13.5);
+            l.VerticalAlignment = VerticalAlignment.Center;
+            var row = UI.Columns("170", "*", "140");
+            row.Children.Add(l);
+            row.Children.Add(slider.At(1).M(0, 0, 12, 0));
+            row.Children.Add(value.At(2));
+            row.Margin = new Thickness(0, 6, 0, hint == null ? 6 : 0);
+            Body.Children.Add(row);
+            if (hint != null)
+            {
+                var h = UI.Sub(hint, 11.5);
+                h.TextWrapping = TextWrapping.Wrap;
+                h.TextTrimming = TextTrimming.None;
+                Body.Children.Add(h.M(0, 0, 0, 6));
+            }
         }
 
         static TextBlock Label(string text) => UI.Text(text, 13.5, FontWeights.SemiBold);
