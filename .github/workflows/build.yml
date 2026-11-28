@@ -1,0 +1,62 @@
+name: Build Nusa
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build
+        run: dotnet build src/Nusa/Nusa.csproj -c Release
+
+      # To'liq, hech narsa o'rnatish shart bo'lmagan versiya (~70 MB)
+      - name: Publish (standalone)
+        run: >
+          dotnet publish src/Nusa/Nusa.csproj -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true -o publish/standalone
+
+      # Kichik versiya: kompyuterda .NET 8 Desktop Runtime o'rnatilgan bo'lishi kerak
+      - name: Publish (small, needs .NET 8 Desktop Runtime)
+        run: >
+          dotnet publish src/Nusa/Nusa.csproj -c Release -r win-x64 --self-contained false
+          -p:PublishSingleFile=true -o publish/small
+
+      - name: Rename
+        shell: pwsh
+        run: |
+          Copy-Item publish/standalone/Nusa.exe publish/Nusa.exe
+          Copy-Item publish/small/Nusa.exe publish/Nusa-small.exe
+          Get-ChildItem publish/*.exe | ForEach-Object { "{0}  {1:N1} MB  SHA256={2}" -f $_.Name, ($_.Length/1MB), (Get-FileHash $_.FullName).Hash }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Nusa-win-x64
+          path: publish/Nusa.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Nusa-win-x64-small
+          path: publish/Nusa-small.exe
+
+      - name: GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            publish/Nusa.exe
+            publish/Nusa-small.exe
