@@ -62,9 +62,10 @@ namespace Nusa.Services
             try
             {
                 _mgr = await WinMgr.RequestAsync();
-                _mgr.CurrentSessionChanged += (_, _) => _ui.BeginInvoke(() => Attach(_mgr.GetCurrentSession()));
-                _mgr.SessionsChanged += (_, _) => _ui.BeginInvoke(() => Attach(_mgr.GetCurrentSession()));
-                Attach(_mgr.GetCurrentSession());
+                _mgr.CurrentSessionChanged += (_, _) => _ui.BeginInvoke(PickSession);
+                _mgr.SessionsChanged += (_, _) => _ui.BeginInvoke(() => { WatchAllSessions(); PickSession(); });
+                WatchAllSessions();
+                PickSession();
             }
             catch
             {
@@ -72,9 +73,68 @@ namespace Nusa.Services
             }
         }
 
+        // Barcha sessiyalar kuzatiladi: brauzer (YouTube, Spotify Web, Yandex Music ...) sessiyasi
+        // ko'pincha Windows "joriy" deb belgilamaydi — shuning uchun o'zimiz o'ynayotganini tanlaymiz.
+        readonly System.Collections.Generic.HashSet<string> _watched = new();
+
+        void WatchAllSessions()
+        {
+            if (_mgr == null) return;
+            try
+            {
+                foreach (var s in _mgr.GetSessions())
+                {
+                    if (!_watched.Add(s.SourceAppUserModelId ?? "")) continue;
+                    s.PlaybackInfoChanged += (_, _) => _ui.BeginInvoke(PickSession);
+                    s.MediaPropertiesChanged += (_, _) => _ui.BeginInvoke(PickSession);
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Qaysi sessiyani ko'rsatish: 1) hozir o'ynayotgan (joriy bo'lsa — u), 2) Windows joriy deb bilgani,
+        /// 3) oxirgi tanlangan (agar hali mavjud bo'lsa), 4) birinchisi.
+        /// </summary>
+        void PickSession()
+        {
+            if (_mgr == null) return;
+            try
+            {
+                var list = _mgr.GetSessions();
+                var current = _mgr.GetCurrentSession();
+                WinSession? playing = null;
+                foreach (var s in list)
+                {
+                    if (!IsPlayingSession(s)) continue;
+                    if (playing == null || (current != null && s.SourceAppUserModelId == current.SourceAppUserModelId)) playing = s;
+                }
+                // Joriy sessiya hali ham o'ynayotgan bo'lsa, almashtirmaymiz (ikki pleyer bir vaqtda o'ynasa sakrab turmasin)
+                if (_session != null && IsPlayingSession(_session) && Contains(list, _session)) playing = _session;
+
+                var pick = playing ?? current ?? (_session != null && Contains(list, _session) ? _session : null) ?? (list.Count > 0 ? list[0] : null);
+                Attach(pick);
+            }
+            catch { }
+        }
+
+        static bool IsPlayingSession(WinSession s)
+        {
+            try { return s.GetPlaybackInfo()?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing; }
+            catch { return false; }
+        }
+
+        static bool Contains(System.Collections.Generic.IReadOnlyList<WinSession> list, WinSession s)
+        {
+            foreach (var x in list) if (ReferenceEquals(x, s) || x.SourceAppUserModelId == s.SourceAppUserModelId) return true;
+            return false;
+        }
+
         void Attach(WinSession? s)
         {
             if (ReferenceEquals(s, _session)) return;
+            // Windows bir sessiya uchun yangi obyekt qaytarishi mumkin — ilova nomi bir xil bo'lsa, o'sha sessiya
+            if (s != null && _session != null && s.SourceAppUserModelId == _session.SourceAppUserModelId) return;
             if (_session != null)
             {
                 _session.MediaPropertiesChanged -= OnProps;

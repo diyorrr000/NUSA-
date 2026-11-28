@@ -56,7 +56,9 @@ namespace Nusa.Glass
         /// </summary>
         public static void ApplyPalette(bool glassOn)
         {
-            bool light = glassOn && IsLight;
+            // Notch ikkala Windows mavzusida ham to'q shisha: WPF uslublaridagi ranglar "muzlatilgan",
+            // shuning uchun matn rangini ish vaqtida ishonchli almashtirib bo'lmaydi (oq fonda oq matn bo'lib qolardi).
+            const bool light = false;
             Set("Fg", light ? Color.FromRgb(0x11, 0x11, 0x14) : Colors.White);
             Set("Sub", light ? Color.FromRgb(0x55, 0x58, 0x60) : Color.FromRgb(0x8E, 0x8E, 0x93));
             Set("Card", light ? Color.FromArgb(0x1F, 0x00, 0x00, 0x00) : glassOn ? Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF) : Color.FromRgb(0x1C, 0x1C, 0x1F));

@@ -26,6 +26,7 @@ namespace Nusa
         bool _glassOn;
         BackdropMode _backdrop = BackdropMode.None;
         ShadowWindow? _shadowWin;
+        BackdropHost? _backdropHost;   // shisha (akril) shu kichik oynada chiziladi
         readonly DispatcherTimer _rimTimer = new(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(50) };
         readonly DispatcherTimer _refractTimer = new(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(1000.0 / GlassConfig.RefractionFps) };
         RefractionRenderer? _refraction;
@@ -44,6 +45,7 @@ namespace Nusa
             IsVisibleChanged += (_, _) =>
             {
                 if (_shadowWin != null) _shadowWin.Visibility = IsVisible && _glassOn && C.S.ShowShadow ? Visibility.Visible : Visibility.Hidden;
+                if (!IsVisible) _backdropHost?.Hide(); else UpdateGlassGeometry();
                 UpdateGlassTimers();
             };
             _rimTimer.Tick += (_, _) => FollowCursorLight();
@@ -78,6 +80,8 @@ namespace Nusa
                     // Klassik qora notch — avvalgi xatti-harakat
                     GlassBackdrop.Apply(_hwnd, BackdropMode.None, false);
                     GlassBackdrop.ClearRegion(_hwnd);
+                    _backdropHost?.Hide();
+                    Island.Child.Clip = null;
                     _backdrop = BackdropMode.None;
                     GlassLayers.Visibility = Rim.Visibility = Visibility.Collapsed;
                     Island.Background = Brushes.Black;
@@ -89,11 +93,17 @@ namespace Nusa
                     return;
                 }
 
-                _backdrop = GlassBackdrop.Apply(_hwnd, ParseMode(C.S.GlassMode), ThemeWatcher.IsLight);
+                // Notch oynasining o'zida shisha/region bo'lmasin (layered oynada region ishlamaydi)
+                GlassBackdrop.Apply(_hwnd, BackdropMode.None, false);
+                GlassBackdrop.ClearRegion(_hwnd);
                 GlassLayers.Visibility = Visibility.Visible;
                 Rim.Visibility = C.S.ShowRim ? Visibility.Visible : Visibility.Collapsed;
                 SetEars(false);
                 EnsureShadow();
+                _backdrop = _backdropHost != null
+                    ? GlassBackdrop.Apply(_backdropHost.Handle, ParseMode(C.S.GlassMode), false)
+                    : BackdropMode.None;
+                if (_backdrop == BackdropMode.None) _backdropHost?.Hide();
                 BuildGlassBrushes();
                 UpdateGlassGeometry();
                 UpdateTint();
@@ -111,19 +121,33 @@ namespace Nusa
 
         void EnsureShadow()
         {
-            if (_shadowWin != null) { _shadowWin.Visibility = IsVisible && C.S.ShowShadow ? Visibility.Visible : Visibility.Hidden; return; }
+            if (_shadowWin != null || _backdropHost != null)
+            {
+                if (_shadowWin != null) _shadowWin.Visibility = IsVisible && C.S.ShowShadow ? Visibility.Visible : Visibility.Hidden;
+                return;
+            }
             try
             {
                 _shadowWin = new ShadowWindow { Left = Left, Top = Top, Width = Width, Height = Height };
                 _shadowWin.Show();
-                Owner = _shadowWin; // notch doim soyaning ustida turadi
             }
             catch { _shadowWin = null; }
+            try
+            {
+                // Tartib (pastdan tepaga): soya → shisha foni → notch
+                _backdropHost = new BackdropHost(_shadowWin?.Handle ?? IntPtr.Zero);
+                new WindowInteropHelper(this).Owner = _backdropHost.Handle;
+            }
+            catch
+            {
+                _backdropHost = null;
+                if (_shadowWin != null) Owner = _shadowWin;
+            }
         }
 
         void BuildGlassBrushes()
         {
-            bool light = ThemeWatcher.IsLight;
+            const bool light = false; // notch ikkala mavzuda ham to'q shisha (matn doim oq)
             Color white(double o) => Color.FromArgb((byte)(255 * o), 255, 255, 255);
 
             _rimBrush = new LinearGradientBrush
@@ -163,7 +187,7 @@ namespace Nusa
         void UpdateTint()
         {
             if (!_glassOn) return;
-            bool light = ThemeWatcher.IsLight;
+            const bool light = false; // notch ikkala mavzuda ham to'q shisha (matn doim oq)
             bool textHeavy = _expanded || _currentAlert != null;
             double alpha;
             if (_backdrop == BackdropMode.None && !RefractionActive)
@@ -195,8 +219,17 @@ namespace Nusa
                 double r = IslandRadius * IslandScale.ScaleY;
                 // Masshtab (NotchScale) ham hisobga olingan radius
                 double sc = b.Height / Math.Max(1, Island.ActualHeight);
-                GlassBackdrop.SetRegion(_hwnd, (int)Math.Round(b.X * dpi), (int)Math.Round(b.Y * dpi),
-                    (int)Math.Round(b.Width * dpi), (int)Math.Round(b.Height * dpi), (int)Math.Round(r * sc * dpi), Floating);
+                // Shisha foni oynasini notch ostiga, aynan uning shakli va o'lchamida qo'yamiz
+                if (_backdropHost != null && _backdrop != BackdropMode.None && IsVisible && Island.IsVisible)
+                {
+                    var tl = Island.PointToScreen(new Point(0, 0)); // fizik piksellar
+                    _backdropHost.Place(_hwnd, (int)Math.Round(tl.X), (int)Math.Round(tl.Y),
+                        (int)Math.Round(b.Width * dpi), (int)Math.Round(b.Height * dpi), (int)Math.Round(r * sc * dpi), Floating);
+                }
+                else _backdropHost?.Hide();
+
+                // Notch ichidagi qatlamlar burchaklardan chiqib ketmasin
+                Island.Child.Clip = RoundedClip(Island.ActualWidth, Island.ActualHeight, IslandRadius, Floating);
                 if (_shadowWin != null)
                 {
                     _shadowWin.Visibility = C.S.ShowShadow && IsVisible ? Visibility.Visible : Visibility.Hidden;
@@ -216,6 +249,28 @@ namespace Nusa
         }
 
         void OnGlassRadiusChanged() => UpdateGlassGeometry();
+
+        /// <summary>Faqat pastki (yoki suzuvchi bo'lsa — to'rtala) burchagi yumaloq to'rtburchak.</summary>
+        static Geometry RoundedClip(double w, double h, double r, bool all)
+        {
+            r = Math.Max(0, Math.Min(r, Math.Min(w, h) / 2));
+            var g = new StreamGeometry();
+            using (var c = g.Open())
+            {
+                double tr = all ? r : 0;
+                c.BeginFigure(new Point(tr, 0), true, true);
+                c.LineTo(new Point(w - tr, 0), false, false);
+                if (tr > 0) c.ArcTo(new Point(w, tr), new Size(tr, tr), 0, false, SweepDirection.Clockwise, false, false);
+                c.LineTo(new Point(w, h - r), false, false);
+                c.ArcTo(new Point(w - r, h), new Size(r, r), 0, false, SweepDirection.Clockwise, false, false);
+                c.LineTo(new Point(r, h), false, false);
+                c.ArcTo(new Point(0, h - r), new Size(r, r), 0, false, SweepDirection.Clockwise, false, false);
+                c.LineTo(new Point(0, tr), false, false);
+                if (tr > 0) c.ArcTo(new Point(tr, 0), new Size(tr, tr), 0, false, SweepDirection.Clockwise, false, false);
+            }
+            g.Freeze();
+            return g;
+        }
 
         void UpdateGlassTimers()
         {

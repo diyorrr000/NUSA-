@@ -50,7 +50,7 @@ namespace Nusa
         /// <summary>Yorug' mavzuda (shisha yoqilgan bo'lsa) matn qora bo'ladi — fon ham yorug' bo'lishi kerak.</summary>
         void ApplyThemeBackground()
         {
-            bool light = Nusa.Glass.ThemeWatcher.IsLight && C.S.LiquidGlass;
+            const bool light = false; // ilova ikkala mavzuda ham to'q ko'rinishda
             Background = light ? UI.Br("#F3F3F6") : UI.Br("#141416");
             NavBg.Background = light ? UI.Br("#E6E7EC") : UI.Br("#0D0D0F");
         }
