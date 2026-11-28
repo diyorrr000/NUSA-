@@ -91,7 +91,14 @@ namespace Nusa.Pages
             var border = new FrameworkElementFactory(typeof(Border), "b");
             border.SetValue(Border.CornerRadiusProperty, new CornerRadius(25));
             border.SetBinding(Border.BackgroundProperty, new System.Windows.Data.Binding("Background") { RelativeSource = System.Windows.Data.RelativeSource.TemplatedParent });
-            var cp = new FrameworkElementFactory(typeof(ContentPresenter));
+            // Ikonka shrifti to'g'ridan-to'g'ri beriladi (meros orqali emas)
+            var cp = new FrameworkElementFactory(typeof(TextBlock));
+            var tp = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent);
+            cp.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("Content") { RelativeSource = tp });
+            cp.SetBinding(TextBlock.FontSizeProperty, new System.Windows.Data.Binding("FontSize") { RelativeSource = tp });
+            cp.SetBinding(TextBlock.ForegroundProperty, new System.Windows.Data.Binding("Foreground") { RelativeSource = tp });
+            cp.SetValue(TextBlock.FontFamilyProperty, UI.IconFont);
+            cp.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.None);
             cp.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Center);
             cp.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center);
             border.AppendChild(cp);

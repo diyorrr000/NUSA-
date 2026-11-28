@@ -23,7 +23,10 @@ namespace Nusa.Services
         public event Action? Changed;
         public event Action? TrackChanged;
 
-        public bool HasSession => _session != null && !string.IsNullOrEmpty(Title);
+        public bool HasSession => !string.IsNullOrEmpty(Title) && (_session != null || _browserActive);
+
+        /// <summary>Ma'lumot SMTC'dan emas, brauzer oynasi sarlavhasidan olinmoqda (zaxira usul).</summary>
+        public bool IsBrowserFallback => _browserActive;
         public string Title { get; private set; } = "";
         public string Artist { get; private set; } = "";
         public string Album { get; private set; } = "";
@@ -86,7 +89,7 @@ namespace Nusa.Services
             try
             {
                 var list = _mgr.GetSessions();
-                if (list.Count == 0) return "Windows hech qanday pleyerni ko'rmayapti";
+                if (list.Count == 0) return "Windows hech qanday pleyerni ko'rmayapti" + BrowserHint();
                 var parts = new System.Collections.Generic.List<string>();
                 foreach (var s in list)
                 {
@@ -104,9 +107,20 @@ namespace Nusa.Services
                     catch { st = "xato"; }
                     parts.Add($"{s.SourceAppUserModelId} — {st}");
                 }
-                return "Windows ko'rgan pleyerlar: " + string.Join("; ", parts) + (LastError.Length > 0 ? " · Xato: " + LastError : "");
+                return "Windows ko'rgan pleyerlar: " + string.Join("; ", parts) + BrowserHint() + (LastError.Length > 0 ? " · Xato: " + LastError : "");
             }
             catch (Exception ex) { return "Sessiyalarni o'qib bo'lmadi: " + ex.Message; }
+        }
+
+        static string BrowserHint()
+        {
+            var running = BrowserMedia.RunningBrowsers();
+            if (running.Length == 0) return "";
+            string hint = " · Ochiq brauzerlar: " + running;
+            if (running.Contains("Yandex"))
+                hint += ". Yandex Browser'da YouTube ko'rinmasa: browser://flags sahifasida \"Hardware Media Key Handling\" " +
+                        "(yoki \"Global Media Controls\") ni Enabled qiling va brauzerni qayta oching. Bungacha Nusa qo'shiq nomini oyna sarlavhasidan oladi.";
+            return hint;
         }
 
         /// <summary>Pleyer topilmagan bo'lsa qayta qidirish (Core har 3 soniyada chaqiradi).</summary>
@@ -118,6 +132,87 @@ namespace Nusa.Services
             // Sessiya bor, lekin nomi bo'sh bo'lib qolgan bo'lsa — ma'lumotni qayta so'raymiz
             if (_session != null && string.IsNullOrEmpty(Title)) _ = RefreshPropsAsync();
         }
+
+        // =====================================================================
+        // ZAXIRA: brauzer YouTube'ni SMTC'ga e'lon qilmasa (masalan, Yandex Browser)
+        // =====================================================================
+        BrowserTrack? _browser;
+        bool _browserActive;
+        bool _polling;
+
+        /// <summary>Core har 2 soniyada chaqiradi. SMTC pleyeri o'ynayotgan bo'lsa hech narsa qilmaydi.</summary>
+        public async void PollBrowser()
+        {
+            if (_polling) return;
+            if (!_browserActive && _session != null && IsPlaying && !string.IsNullOrEmpty(Title)) return;
+            _polling = true;
+            BrowserTrack? t = null;
+            try { t = await Task.Run(BrowserMedia.Detect); }
+            catch (Exception ex) { Log("BrowserMedia: " + ex.Message); }
+            finally { _polling = false; }
+
+            bool smtcPlaying = _session != null && IsPlayingSession(_session);
+            bool smtcHasTrack = _session != null && !_browserActive && !string.IsNullOrEmpty(Title);
+            if (t != null && !smtcPlaying && (t.Playing || !smtcHasTrack)) ActivateBrowser(t);
+            else if (_browserActive) DeactivateBrowser();
+        }
+
+        void ActivateBrowser(BrowserTrack t)
+        {
+            bool newTrack = !_browserActive || _browser?.Title != t.Title || _browser?.Artist != t.Artist;
+            bool changed = newTrack || _browser?.Playing != t.Playing;
+            _browserActive = true;
+            _browser = t;
+            if (!changed) return;
+            Title = t.Title;
+            Artist = t.Artist;
+            Album = "";
+            SourceApp = t.Browser;
+            Art = null;
+            ArtColor = Color.FromRgb(0xFF, 0x3B, 0x30); // YouTube qizili
+            IsPlaying = t.Playing;
+            Duration = TimeSpan.Zero;
+            _position = TimeSpan.Zero;
+            Shuffle = CanShuffle = CanRepeat = false;
+            Repeat = 0;
+            _trackKey = Title + "|" + Artist;
+            Changed?.Invoke();
+            if (newTrack) TrackChanged?.Invoke();
+        }
+
+        void DeactivateBrowser()
+        {
+            _browserActive = false;
+            _browser = null;
+            _trackKey = "";
+            if (_session != null)
+            {
+                SourceApp = _session.SourceAppUserModelId ?? "";
+                _ = RefreshPropsAsync();
+                RefreshPlayback();
+                RefreshTimeline();
+            }
+            else
+            {
+                Title = Artist = Album = SourceApp = "";
+                Art = null; IsPlaying = false; Duration = TimeSpan.Zero; _position = TimeSpan.Zero;
+                Changed?.Invoke();
+                TrackChanged?.Invoke();
+            }
+        }
+
+        /// <summary>SMTC hodisasi kelganda: brauzer zaxirasi faol bo'lsa va SMTC o'ynamasa — e'tiborsiz qoldiramiz.</summary>
+        bool SuppressedByBrowser(WinSession s)
+        {
+            if (!_browserActive) return false;
+            if (!IsPlayingSession(s)) return true;
+            _browserActive = false; // SMTC pleyeri o'ynay boshladi — u ustun
+            _browser = null;
+            return false;
+        }
+
+        void AfterBrowserCommand() =>
+            _ = Task.Delay(700).ContinueWith(_ => _ui.BeginInvoke(PollBrowser));
 
         static void Log(string text)
         {
@@ -131,26 +226,45 @@ namespace Nusa.Services
 
         // Barcha sessiyalar kuzatiladi: brauzer (YouTube, Spotify Web, Yandex Music ...) sessiyasi
         // ko'pincha Windows "joriy" deb belgilamaydi — shuning uchun o'zimiz o'ynayotganini tanlaymiz.
-        readonly System.Collections.Generic.HashSet<string> _watched = new();
+        // Bir brauzerning bir nechta tabi bir xil ilova nomiga (AUMID) ega bo'lishi mumkin, shuning uchun
+        // sessiyalar obyekt bo'yicha farqlanadi (CsWinRT bir native sessiya uchun bitta obyekt qaytaradi).
+        readonly System.Collections.Generic.HashSet<WinSession> _watched = new();
+        /// <summary>Har bir sessiya qachondan beri o'ynayotgani — eng oxirgi boshlangani tanlanadi.</summary>
+        readonly System.Collections.Generic.Dictionary<WinSession, DateTime> _playingSince = new();
 
         void WatchAllSessions()
         {
             if (_mgr == null) return;
             try
             {
-                foreach (var s in _mgr.GetSessions())
+                var list = _mgr.GetSessions();
+                // Yopilgan sessiyalarni ro'yxatdan chiqaramiz
+                _watched.RemoveWhere(w => !ContainsRef(list, w));
+                foreach (var k in new System.Collections.Generic.List<WinSession>(_playingSince.Keys))
+                    if (!ContainsRef(list, k)) _playingSince.Remove(k);
+
+                foreach (var s in list)
                 {
-                    if (!_watched.Add(s.SourceAppUserModelId ?? "")) continue;
-                    s.PlaybackInfoChanged += (_, _) => _ui.BeginInvoke(PickSession);
-                    s.MediaPropertiesChanged += (_, _) => _ui.BeginInvoke(PickSession);
+                    if (IsPlayingSession(s) && !_playingSince.ContainsKey(s)) _playingSince[s] = DateTime.MinValue.AddTicks(1);
+                    if (!_watched.Add(s)) continue;
+                    var session = s;
+                    session.PlaybackInfoChanged += (_, _) => _ui.BeginInvoke(() =>
+                    {
+                        if (IsPlayingSession(session)) { if (!_playingSince.ContainsKey(session)) _playingSince[session] = DateTime.Now; }
+                        else _playingSince.Remove(session);
+                        PickSession();
+                    });
+                    session.MediaPropertiesChanged += (_, _) => _ui.BeginInvoke(PickSession);
                 }
             }
             catch { }
         }
 
         /// <summary>
-        /// Qaysi sessiyani ko'rsatish: 1) hozir o'ynayotgan (joriy bo'lsa — u), 2) Windows joriy deb bilgani,
-        /// 3) oxirgi tanlangan (agar hali mavjud bo'lsa), 4) birinchisi.
+        /// Qaysi sessiyani ko'rsatish:
+        ///  1) o'ynayotganlar ichidan ENG OXIRGI boshlangani (bir nechta brauzer/pleyer bir vaqtda o'ynasa);
+        ///  2) hech biri o'ynamasa — avval ko'rsatilgani (agar hali mavjud bo'lsa);
+        ///  3) Windows "joriy" deb bilgani;  4) birinchisi.
         /// </summary>
         void PickSession()
         {
@@ -160,18 +274,25 @@ namespace Nusa.Services
                 var list = _mgr.GetSessions();
                 var current = _mgr.GetCurrentSession();
                 WinSession? playing = null;
+                DateTime best = DateTime.MinValue;
                 foreach (var s in list)
                 {
                     if (!IsPlayingSession(s)) continue;
-                    if (playing == null || (current != null && s.SourceAppUserModelId == current.SourceAppUserModelId)) playing = s;
+                    var since = _playingSince.TryGetValue(s, out var t) ? t : DateTime.MinValue.AddTicks(1);
+                    // Teng bo'lsa — Windows "joriy" deb bilganiga ustunlik
+                    if (playing == null || since > best || (since == best && current != null && ReferenceEquals(s, current)))
+                    {
+                        playing = s;
+                        best = since;
+                    }
                 }
-                // Joriy sessiya hali ham o'ynayotgan bo'lsa, almashtirmaymiz (ikki pleyer bir vaqtda o'ynasa sakrab turmasin)
-                if (_session != null && IsPlayingSession(_session) && Contains(list, _session)) playing = _session;
-
-                var pick = playing ?? current ?? (_session != null && Contains(list, _session) ? _session : null) ?? (list.Count > 0 ? list[0] : null);
+                var pick = playing
+                    ?? (_session != null && ContainsRef(list, _session) ? _session : null)
+                    ?? current
+                    ?? (list.Count > 0 ? list[0] : null);
                 Attach(pick);
             }
-            catch { }
+            catch (Exception ex) { Log("PickSession: " + ex.Message); }
         }
 
         static bool IsPlayingSession(WinSession s)
@@ -180,17 +301,20 @@ namespace Nusa.Services
             catch { return false; }
         }
 
-        static bool Contains(System.Collections.Generic.IReadOnlyList<WinSession> list, WinSession s)
+        static bool ContainsRef(System.Collections.Generic.IReadOnlyList<WinSession> list, WinSession s)
         {
-            foreach (var x in list) if (ReferenceEquals(x, s) || x.SourceAppUserModelId == s.SourceAppUserModelId) return true;
+            foreach (var x in list) if (ReferenceEquals(x, s)) return true;
             return false;
         }
 
         void Attach(WinSession? s)
         {
-            if (ReferenceEquals(s, _session)) return;
-            // Windows bir sessiya uchun yangi obyekt qaytarishi mumkin — ilova nomi bir xil bo'lsa, o'sha sessiya
-            if (s != null && _session != null && s.SourceAppUserModelId == _session.SourceAppUserModelId) return;
+            if (ReferenceEquals(s, _session))
+            {
+                // O'sha sessiya, lekin nomi hali kelmagan bo'lsa — qayta so'raymiz
+                if (s != null && string.IsNullOrEmpty(Title)) _ = RefreshPropsAsync();
+                return;
+            }
             if (_session != null)
             {
                 _session.MediaPropertiesChanged -= OnProps;
@@ -223,7 +347,7 @@ namespace Nusa.Services
         async Task RefreshPropsAsync()
         {
             var s = _session;
-            if (s == null) return;
+            if (s == null || SuppressedByBrowser(s)) return;
             try
             {
                 var p = await s.TryGetMediaPropertiesAsync();
@@ -273,7 +397,7 @@ namespace Nusa.Services
         void RefreshPlayback()
         {
             var s = _session;
-            if (s == null) return;
+            if (s == null || SuppressedByBrowser(s)) return;
             try
             {
                 var info = s.GetPlaybackInfo();
@@ -298,7 +422,7 @@ namespace Nusa.Services
         void RefreshTimeline()
         {
             var s = _session;
-            if (s == null) return;
+            if (s == null || SuppressedByBrowser(s)) return;
             try
             {
                 var t = s.GetTimelineProperties();
@@ -312,13 +436,34 @@ namespace Nusa.Services
             catch { }
         }
 
-        public async void PlayPause() { try { if (_session != null) await _session.TryTogglePlayPauseAsync(); } catch { } }
-        public async void Pause() { try { if (_session != null && IsPlaying) await _session.TryPauseAsync(); } catch { } }
-        public async void Next() { try { if (_session != null) await _session.TrySkipNextAsync(); } catch { } }
-        public async void Previous() { try { if (_session != null) await _session.TrySkipPreviousAsync(); } catch { } }
+        // Boshqaruv: SMTC orqali; brauzer zaxirasida — Windows media tugmalari orqali
+        public async void PlayPause()
+        {
+            if (_browserActive) { BrowserMedia.PlayPause(); AfterBrowserCommand(); return; }
+            try { if (_session != null) await _session.TryTogglePlayPauseAsync(); } catch { }
+        }
+
+        public async void Pause()
+        {
+            if (_browserActive) { if (IsPlaying) { BrowserMedia.PlayPause(); AfterBrowserCommand(); } return; }
+            try { if (_session != null && IsPlaying) await _session.TryPauseAsync(); } catch { }
+        }
+
+        public async void Next()
+        {
+            if (_browserActive) { BrowserMedia.Next(); AfterBrowserCommand(); return; }
+            try { if (_session != null) await _session.TrySkipNextAsync(); } catch { }
+        }
+
+        public async void Previous()
+        {
+            if (_browserActive) { BrowserMedia.Previous(); AfterBrowserCommand(); return; }
+            try { if (_session != null) await _session.TrySkipPreviousAsync(); } catch { }
+        }
 
         public async void ToggleShuffle()
         {
+            if (_browserActive) return;
             try { if (_session != null) await _session.TryChangeShuffleActiveAsync(!Shuffle); } catch { }
         }
 
@@ -327,7 +472,7 @@ namespace Nusa.Services
         {
             try
             {
-                if (_session == null) return;
+                if (_session == null || _browserActive) return;
                 var next = Repeat switch
                 {
                     0 => Windows.Media.MediaPlaybackAutoRepeatMode.List,
@@ -341,6 +486,7 @@ namespace Nusa.Services
 
         public async void Seek(TimeSpan pos)
         {
+            if (_browserActive) return; // brauzer zaxirasida vaqt chizig'i yo'q
             try
             {
                 if (_session == null) return;
@@ -357,6 +503,7 @@ namespace Nusa.Services
         {
             get
             {
+                if (_browserActive) return SourceApp; // "Yandex Browser", "Chrome" ...
                 var s = SourceApp.ToLowerInvariant();
                 if (s.Contains("spotify")) return "Spotify";
                 if (s.Contains("chrome")) return "Chrome";

@@ -51,8 +51,14 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
+                        <!-- Ikonka shrifti TO'G'RIDAN-TO'G'RI beriladi (meros orqali emas) — aks holda "▯" chiqadi -->
                         <Border x:Name="b" Background="{TemplateBinding Background}" CornerRadius="17">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                       FontFamily="{StaticResource IconFont}"
+                                       FontSize="{Binding FontSize, RelativeSource={RelativeSource TemplatedParent}}"
+                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}}"
+                                       TextTrimming="None"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">

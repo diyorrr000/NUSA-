@@ -125,11 +125,14 @@ namespace Nusa.Services
         public void Raise(Alert a) => AlertRaised?.Invoke(a);
 
         int _mediaRescan;
+        int _browserPoll;
 
         void OnTick()
         {
             // Pleyer topilmagan bo'lsa har 3 soniyada qayta qidiramiz (Windows xabari kelmay qolishi mumkin)
             if (!Media.HasSession && ++_mediaRescan >= 3) { _mediaRescan = 0; Media.Rescan(); }
+            // Brauzer zaxirasi: SMTC ko'rmagan brauzer musiqasini har 2 soniyada tekshiramiz
+            if (++_browserPoll >= 2) { _browserPoll = 0; Media.PollBrowser(); }
             TickPomodoro();
             var now = DateTime.Now;
             if (now.Minute != _lastMinute)
@@ -154,7 +157,8 @@ namespace Nusa.Services
             CurrentLyrics = null;
             LyricsLoading = false;
             LyricsChanged?.Invoke();
-            if (!S.ShowLyrics || !Media.HasSession) return;
+            // Brauzer zaxirasida qo'shiq pozitsiyasi noma'lum — sinxron matn ko'rsatib bo'lmaydi
+            if (!S.ShowLyrics || !Media.HasSession || Media.IsBrowserFallback) return;
             LyricsLoading = true;
             LyricsChanged?.Invoke();
             var title = Media.Title;
