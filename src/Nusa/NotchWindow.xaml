@@ -7,7 +7,8 @@
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True" ShowActivated="False"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
-        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType"
+        FontFamily="{StaticResource UiFont}" FontSize="13" Foreground="{StaticResource Fg}">
 
     <Grid>
         <StackPanel x:Name="NotchRow" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Top">

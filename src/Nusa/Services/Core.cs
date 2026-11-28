@@ -124,8 +124,12 @@ namespace Nusa.Services
 
         public void Raise(Alert a) => AlertRaised?.Invoke(a);
 
+        int _mediaRescan;
+
         void OnTick()
         {
+            // Pleyer topilmagan bo'lsa har 3 soniyada qayta qidiramiz (Windows xabari kelmay qolishi mumkin)
+            if (!Media.HasSession && ++_mediaRescan >= 3) { _mediaRescan = 0; Media.Rescan(); }
             TickPomodoro();
             var now = DateTime.Now;
             if (now.Minute != _lastMinute)

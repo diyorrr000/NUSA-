@@ -67,10 +67,66 @@ namespace Nusa.Services
                 WatchAllSessions();
                 PickSession();
             }
-            catch
+            catch (Exception ex)
             {
-                // Media API mavjud emas (juda eski Windows) — musiqa funksiyasisiz davom etamiz
+                // Media API mavjud emas yoki xato — musiqa funksiyasisiz davom etamiz, sababini ko'rsatamiz
+                LastError = "Media API ishga tushmadi: " + ex.Message;
+                Log(ex.ToString());
             }
+        }
+
+        // ---------- Diagnostika ----------
+        /// <summary>Oxirgi xato (musiqa sahifasida ko'rsatiladi).</summary>
+        public string LastError { get; private set; } = "";
+
+        /// <summary>Windows ko'rayotgan barcha pleyerlar: "chrome.exe — o'ynamoqda" ko'rinishida.</summary>
+        public string DescribeSessions()
+        {
+            if (_mgr == null) return LastError.Length > 0 ? LastError : "Media API hali ishga tushmagan";
+            try
+            {
+                var list = _mgr.GetSessions();
+                if (list.Count == 0) return "Windows hech qanday pleyerni ko'rmayapti";
+                var parts = new System.Collections.Generic.List<string>();
+                foreach (var s in list)
+                {
+                    string st;
+                    try
+                    {
+                        st = s.GetPlaybackInfo()?.PlaybackStatus switch
+                        {
+                            GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing => "o'ynamoqda",
+                            GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused => "pauzada",
+                            GlobalSystemMediaTransportControlsSessionPlaybackStatus.Stopped => "to'xtagan",
+                            _ => "?",
+                        };
+                    }
+                    catch { st = "xato"; }
+                    parts.Add($"{s.SourceAppUserModelId} — {st}");
+                }
+                return "Windows ko'rgan pleyerlar: " + string.Join("; ", parts) + (LastError.Length > 0 ? " · Xato: " + LastError : "");
+            }
+            catch (Exception ex) { return "Sessiyalarni o'qib bo'lmadi: " + ex.Message; }
+        }
+
+        /// <summary>Pleyer topilmagan bo'lsa qayta qidirish (Core har 3 soniyada chaqiradi).</summary>
+        public void Rescan()
+        {
+            if (_mgr == null) { _ = InitAsync(); return; }
+            WatchAllSessions();
+            PickSession();
+            // Sessiya bor, lekin nomi bo'sh bo'lib qolgan bo'lsa — ma'lumotni qayta so'raymiz
+            if (_session != null && string.IsNullOrEmpty(Title)) _ = RefreshPropsAsync();
+        }
+
+        static void Log(string text)
+        {
+            try
+            {
+                System.IO.Directory.CreateDirectory(Storage.Folder);
+                System.IO.File.AppendAllText(System.IO.Path.Combine(Storage.Folder, "media.log"), $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {text}\n");
+            }
+            catch { }
         }
 
         // Barcha sessiyalar kuzatiladi: brauzer (YouTube, Spotify Web, Yandex Music ...) sessiyasi
@@ -207,7 +263,11 @@ namespace Nusa.Services
                 Changed?.Invoke();
                 if (newTrack) TrackChanged?.Invoke();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LastError = "Qo'shiq ma'lumotini olib bo'lmadi: " + ex.Message;
+                Log(ex.ToString());
+            }
         }
 
         void RefreshPlayback()

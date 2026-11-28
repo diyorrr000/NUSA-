@@ -29,6 +29,8 @@ namespace Nusa.Pages
         readonly Button _repeatBtn;
         readonly Grid _player;
         readonly Grid _empty;
+        readonly TextBlock _diag = UI.Sub("", 11);
+        int _diagTick;
         readonly Grid _root;
 
         // Matn paneli
@@ -127,6 +129,13 @@ namespace Nusa.Pages
             foreach (UIElement c in emptyCol.Children) if (c is FrameworkElement fe) fe.HorizontalAlignment = HorizontalAlignment.Center;
             ((TextBlock)emptyCol.Children[2]).TextAlignment = TextAlignment.Center;
             ((TextBlock)emptyCol.Children[2]).TextWrapping = TextWrapping.Wrap;
+            // Diagnostika: Windows qaysi pleyerlarni ko'rayotgani (muammoni topish uchun)
+            _diag.TextAlignment = TextAlignment.Center;
+            _diag.TextWrapping = TextWrapping.Wrap;
+            _diag.TextTrimming = TextTrimming.None;
+            _diag.Opacity = 0.7;
+            _diag.HorizontalAlignment = HorizontalAlignment.Center;
+            emptyCol.Children.Add(_diag.M(0, 8, 0, 0));
             emptyCol.VerticalAlignment = VerticalAlignment.Center;
             _empty.Children.Add(emptyCol);
 
@@ -152,7 +161,12 @@ namespace Nusa.Pages
             host.Children.Add(_empty);
             Content = host;
 
-            _timer.Tick += (_, _) => UpdateProgress();
+            _timer.Tick += (_, _) =>
+            {
+                UpdateProgress();
+                // Pleyer topilmagan bo'lsa diagnostikani har 2 soniyada yangilaymiz
+                if (!C.Media.HasSession && ++_diagTick % 8 == 0) UpdateAll();
+            };
         }
 
         public override double PreferredHeight => 196;
@@ -188,7 +202,7 @@ namespace Nusa.Pages
             bool has = m.HasSession;
             _root.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
             _empty.Visibility = has ? Visibility.Collapsed : Visibility.Visible;
-            if (!has) return;
+            if (!has) { _diag.Text = m.DescribeSessions(); return; }
 
             _art.Source = m.Art;
             _artGlow.Effect = new DropShadowEffect { BlurRadius = 34, ShadowDepth = 0, Opacity = 0.6, Color = m.ArtColor };

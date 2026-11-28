@@ -19,10 +19,9 @@
         <SolidColorBrush x:Key="Teal" Color="#64D2FF"/>
         <SolidColorBrush x:Key="Purple" Color="#BF5AF2"/>
 
+        <!-- Shrift, rang va o'lcham bu yerda BERILMAYDI — ular oynadan meros qilib olinadi.
+             Aks holda tugma ichidagi ikonka (Segoe Fluent Icons) oddiy shrift bilan chizilib, "▯" bo'lib qoladi. -->
         <Style TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
-            <Setter Property="Foreground" Value="{StaticResource Fg}"/>
-            <Setter Property="FontSize" Value="13"/>
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
 

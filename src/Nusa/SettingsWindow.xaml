@@ -4,7 +4,8 @@
         Title="Nusa — Sozlamalar"
         Width="820" Height="760" MinWidth="640" MinHeight="460"
         WindowStartupLocation="CenterScreen"
-        Background="#141416" Foreground="White"
+        Background="#141416" Foreground="{StaticResource Fg}"
+        FontFamily="{StaticResource UiFont}" FontSize="13"
         Icon="Assets/nusa.ico"
         UseLayoutRounding="True">
     <Grid>
